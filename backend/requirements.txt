@@ -1,0 +1,30 @@
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Database
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
+greenlet==3.5.2
+
+# LLM Clients
+openai==1.58.1
+groq==0.13.1
+
+# YAML
+pyyaml==6.0.2
+
+# Environment
+python-dotenv==1.0.1
+
+# HTTP Client
+httpx==0.28.1
+
+# Utilities
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# GitHub Integration
+PyGithub==2.1.1
+python-multipart==0.0.9
+jinja2==3.1.4

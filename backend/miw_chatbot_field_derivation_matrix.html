@@ -1,0 +1,48 @@
+<style>
+table { width:100%; border-collapse:collapse; font-size:13px; color:var(--color-text-primary); }
+th { text-align:left; padding:8px 10px; font-weight:500; border-bottom:2px solid var(--color-border-primary); }
+td { padding:6px 10px; border-bottom:1px solid var(--color-border-tertiary); vertical-align:top; }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }
+.ask { background:var(--color-background-info); color:var(--color-text-info); }
+.derive { background:var(--color-background-success); color:var(--color-text-success); }
+.default { background:var(--color-background-warning); color:var(--color-text-warning); }
+.confirm { background:var(--color-background-danger); color:var(--color-text-danger); }
+.section { font-weight:500; padding:12px 10px 6px; color:var(--color-text-secondary); border-bottom:none; }
+</style>
+
+<h2 class="sr-only">Field derivation matrix for S3 and Glue DB YAML generation</h2>
+
+<table>
+<tr><th>Field</th><th>Action</th><th>Logic</th></tr>
+
+<tr><td class="section" colspan="3">S3 bucket fields</td></tr>
+<tr><td>intake_id</td><td><span class="badge confirm">confirm</span></td><td>Ask mapping — never assume across resources</td></tr>
+<tr><td>bucket_name</td><td><span class="badge derive">derive</span></td><td>prefix (acct table) + subgroup + suffix (usage_type). Editable</td></tr>
+<tr><td>bucket_description</td><td><span class="badge derive">derive</span></td><td>Auto-generate from enterprise + subgroup + usage. Editable</td></tr>
+<tr><td>aws_account_id</td><td><span class="badge derive">derive</span></td><td>Account table lookup: env + enterprise + usage_type</td></tr>
+<tr><td>aws_region</td><td><span class="badge default">default</span></td><td>Always us-east-1</td></tr>
+<tr><td>usage_type</td><td><span class="badge ask">ask</span></td><td>Q2 multi-select, filtered by account type</td></tr>
+<tr><td>enterprise_or_func_name</td><td><span class="badge ask">ask</span></td><td>Q2, multi-select for Lakehouse; single for Compute</td></tr>
+<tr><td>enterprise_or_func_subgrp_name</td><td><span class="badge ask">ask</span></td><td>Q3, filtered by enterprise. Optional for Lakehouse</td></tr>
+<tr><td>versioning_enabled</td><td><span class="badge default">default</span></td><td>Auto-set true for Scripts</td></tr>
+
+<tr><td class="section" colspan="3">Glue database fields</td></tr>
+<tr><td>intake_id</td><td><span class="badge confirm">confirm</span></td><td>Ask mapping — can differ per resource</td></tr>
+<tr><td>database_name</td><td><span class="badge derive">derive</span></td><td>Naming rules: lh_/lh_cdp_ prefix + source/product + layer + env. Editable</td></tr>
+<tr><td>database_s3_location</td><td><span class="badge derive">derive</span></td><td>s3://bucket/layer/current|cdp/env/src|dp/name/</td></tr>
+<tr><td>database_description</td><td><span class="badge derive">derive</span></td><td>Auto-generate. Editable</td></tr>
+<tr><td>aws_account_id</td><td><span class="badge derive">derive</span></td><td>raw → Lakehouse, cur/srv → Compute, int → ask</td></tr>
+<tr><td>region</td><td><span class="badge default">default</span></td><td>Always us-east-1</td></tr>
+<tr><td>data_construct</td><td><span class="badge derive">derive</span></td><td>Raw → Source, Curated/Serving → DataProduct</td></tr>
+<tr><td>data_env</td><td><span class="badge ask">ask</span></td><td>snd / dev / stg / prd — can differ from account env</td></tr>
+<tr><td>data_layer</td><td><span class="badge derive">derive</span></td><td>Derived from Q2 resource selection</td></tr>
+<tr><td>source_name</td><td><span class="badge ask">ask</span></td><td>Only for Lakehouse Source. Free-form text</td></tr>
+<tr><td>data_product_name</td><td><span class="badge ask">ask</span></td><td>Only for Compute DataProduct. Free-form text</td></tr>
+<tr><td>data_classification</td><td><span class="badge ask">ask</span></td><td>Q3, 5 options</td></tr>
+<tr><td>data_privacy</td><td><span class="badge ask">ask</span></td><td>Q3, PI/PCI/PHI/BCI/NONE</td></tr>
+<tr><td>enterprise_or_func_name</td><td><span class="badge ask">ask</span></td><td>Q2 for Lakehouse; derive for Compute</td></tr>
+<tr><td>enterprise_or_func_subgrp_name</td><td><span class="badge ask">ask</span></td><td>Q3, filtered by enterprise</td></tr>
+<tr><td>data_owner_email</td><td><span class="badge confirm">confirm</span></td><td>Fetch from org ref file → confirm per resource</td></tr>
+<tr><td>data_owner_github_uname</td><td><span class="badge confirm">confirm</span></td><td>Fetch from org ref file → confirm per resource</td></tr>
+<tr><td>data_leader</td><td><span class="badge confirm">confirm</span></td><td>Fetch from org ref file → confirm per resource</td></tr>
+</table>
