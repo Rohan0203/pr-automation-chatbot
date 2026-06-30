@@ -1,0 +1,43 @@
+# SMUS Role field specifications
+# Source: lakehouse-001/smus_roles/*.yaml
+
+resource_type: smus_role
+description: SMUS role (AAD group for data access)
+source_path: aws_lakehouse/*/smus_roles/
+
+fields:
+  - name: intake_id
+    description: "Request tracking ID"
+
+  - name: aad_group_name
+    description: "AAD group name (e.g. minerva_food_prgl_dataengineer_prd)"
+
+  - name: aws_account_id
+    description: "AWS account ID"
+
+  - name: purpose
+    description: "Purpose description for this SMUS role group"
+
+  - name: role_owner_ds_id
+    description: "Role owner's DS ID (e.g. a290919)"
+
+  - name: role_owner_email_id
+    description: "Role owner's email (e.g. John_Doe@cargill.com)"
+
+  - name: data_leader
+    description: "Data leader's name or ID"
+
+  - name: governance_and_access_lead
+    description: "Governance and access lead's ID (e.g. k040619)"
+
+  - name: enterprise_or_func_name
+    description: "Enterprise or functional area"
+    options: ["AGTR", "CORP", "FOOD", "SPEC"]
+
+  - name: enterprise_or_func_subgrp_name
+    description: "Subgroup (e.g. PRGL, ANH)"
+
+  - name: sub_function
+    description: "Sub-function (e.g. NA if not applicable)"
+    required: false
+    default: "NA"

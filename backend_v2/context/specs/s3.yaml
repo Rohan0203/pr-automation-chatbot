@@ -1,0 +1,35 @@
+# S3 Bucket field specifications
+# Source: lakehouse-001/s3/*.yaml and compute-*/s3/*.yaml
+
+resource_type: s3
+description: S3 storage bucket for data lake
+source_path: aws_lakehouse/*/s3/
+
+fields:
+  - name: intake_id
+    description: "Request tracking ID (e.g. M0000485)"
+
+  - name: bucket_name
+    description: "S3 bucket name (e.g. prd-lh1-agtr-src, dev-cmp1-food-scripts)"
+
+  - name: bucket_description
+    description: "Human-readable purpose of the bucket"
+
+  - name: aws_account_id
+    description: "AWS account ID (12-digit, single-quoted in YAML)"
+
+  - name: aws_region
+    description: "AWS region"
+    derivable: true
+    default: "us-east-1"
+
+  - name: usage_type
+    description: "Purpose category of the bucket"
+    options: ["Source", "DataProduct", "Scripts", "EngAssets"]
+
+  - name: enterprise_or_func_name
+    description: "Enterprise or functional area"
+    options: ["AGTR", "CORP", "FOOD", "SPEC"]
+
+  - name: enterprise_or_func_subgrp_name
+    description: "Subgroup within the enterprise (e.g. EMEA, FIN, PRGL). Can be empty string."

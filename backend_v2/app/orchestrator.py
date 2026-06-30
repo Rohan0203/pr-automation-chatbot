@@ -4,7 +4,7 @@ Routes messages based on (session.mode, resource statuses).
 Makes targeted LLM calls, updates state, returns response.
 """
 from app.models.state import Session, SessionMode, Resource, ResourceStatus
-from app.config.field_specs import FIELD_SPECS, SUPPORTED_RESOURCES
+from app.context.registry import get_field_specs, get_all_field_specs, get_supported_resources
 from app.core.collector import get_askable_fields, is_collection_complete, build_collection_plan
 from app.llm.parse import detect_intent_and_extract, extract_fields
 from app.llm.format import format_question
@@ -31,7 +31,7 @@ async def process_message(session: Session, message: str) -> str:
 
 async def _handle_idle(session: Session, message: str) -> str:
     """User hasn't started anything yet. Detect intent."""
-    result = await detect_intent_and_extract(message, FIELD_SPECS)
+    result = await detect_intent_and_extract(message, get_all_field_specs())
 
     intent = result.get("intent", "general_question")
     resources = result.get("resources", [])
@@ -45,7 +45,7 @@ async def _handle_idle(session: Session, message: str) -> str:
 
     # Create resources
     for rtype in resources:
-        if rtype in SUPPORTED_RESOURCES:
+        if rtype in get_supported_resources():
             session.resources.append(Resource(resource_type=rtype, status=ResourceStatus.COLLECTING))
 
     if not session.resources:
@@ -106,7 +106,7 @@ async def _handle_working(session: Session, message: str) -> str:
         applies_to = info.get("applies_to", "all")
 
         # Clean up field name if it has resource suffix
-        for rtype in SUPPORTED_RESOURCES:
+        for rtype in get_supported_resources():
             if field_name.endswith(f"_{rtype}"):
                 actual_field = field_name[: -(len(rtype) + 1)]
                 applies_to = rtype
@@ -117,7 +117,7 @@ async def _handle_working(session: Session, message: str) -> str:
             for r in active_resources:
                 if applies_to == "all" or applies_to == r.resource_type:
                     # Only apply if this resource actually has this field
-                    spec_names = {s.name for s in FIELD_SPECS.get(r.resource_type, [])}
+                    spec_names = {s.name for s in get_field_specs(r.resource_type)}
                     if actual_field in spec_names:
                         r.fields[actual_field] = info["value"]
                         r.retry_counts.pop(actual_field, None)
@@ -176,7 +176,7 @@ async def _run_collection_cycle(session: Session, errors: dict | None = None) ->
 def _apply_extracted_fields(session: Session, extracted: dict):
     """Apply extracted fields from intent detection to matching resources."""
     for resource in session.resources:
-        specs = FIELD_SPECS.get(resource.resource_type, [])
+        specs = get_field_specs(resource.resource_type)
         spec_names = {s.name for s in specs if not s.derivable}
         for field_name, value in extracted.items():
             if field_name in spec_names:

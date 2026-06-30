@@ -1,0 +1,43 @@
+# SMUS Project field specifications
+# Source: lakehouse-001/smus_project/*.yaml
+
+resource_type: smus_project
+description: SMUS project (groups SMUS roles with compute access)
+source_path: aws_lakehouse/*/smus_project/
+
+fields:
+  - name: intake_id
+    description: "Request tracking ID"
+
+  - name: aws_account_id
+    description: "AWS account ID"
+
+  - name: smus_project_name
+    description: "Project name (e.g. food_prgl_dataengineer_prd_prj)"
+
+  - name: project_description
+    description: "Description of the SMUS project's purpose"
+
+  - name: enterprise_or_func_name
+    description: "Enterprise or functional area"
+    options: ["AGTR", "CORP", "FOOD", "SPEC"]
+
+  - name: enterprise_or_func_subgrp_name
+    description: "Subgroup (e.g. PRGL, TDA_COCOA)"
+
+  - name: parent_domain_unit
+    description: "Parent domain unit (e.g. Minerva)"
+    default: "Minerva"
+
+  - name: data_leader
+    description: "Data leader's name or ID"
+
+  - name: project_membership
+    description: "List of SMUS role group names that belong to this project"
+
+  - name: compute_size
+    description: "Compute size"
+    options: ["XSML", "SML", "MED", "LRG", "XLRG"]
+
+  - name: access_to_resources
+    description: "List of glue_databases this project can access"

@@ -1,0 +1,38 @@
+# Resource Policy field specifications
+# Source: lakehouse-001/resource_policy/*.yaml
+
+resource_type: resource_policy
+description: Cross-account resource access policy
+source_path: aws_lakehouse/*/resource_policy/
+
+fields:
+  - name: intake_id
+    description: "Request tracking ID"
+
+  - name: resource_policy_name
+    description: "Policy name (e.g. minerva_cmt_food_prgl_prd_rp)"
+
+  - name: resource_policy_description
+    description: "Description of the resource policy's purpose"
+
+  - name: aws_account_id
+    description: "AWS account ID where the policy is applied"
+
+  - name: cross_account_aws_id
+    description: "Cross-account AWS ID that will be granted access (12-digit)"
+
+  - name: enterprise_or_func_name
+    description: "Enterprise or functional area"
+    options: ["AGTR", "CORP", "FOOD", "SPEC"]
+
+  - name: enterprise_or_func_subgrp_name
+    description: "Subgroup (e.g. PRGL, NA, APAC)"
+
+  - name: data_leader
+    description: "Data leader's name or ID"
+
+  - name: principal_role_arn
+    description: "ARN of the principal role being granted access"
+
+  - name: access_to_resources
+    description: "Resources: glue_databases (list of DB names) and s3_prefixes (list of S3 paths)"

@@ -1,0 +1,74 @@
+# Glue Database field specifications
+# Source: lakehouse-001/glue_db/*.yaml and compute-*/glue_db/*.yaml
+
+resource_type: glue_db
+description: AWS Glue database for data catalog
+source_path: aws_lakehouse/*/glue_db/
+
+fields:
+  - name: intake_id
+    description: "Request tracking ID (e.g. M0000934)"
+
+  - name: database_name
+    description: "Glue database name (e.g. lh_cdp_sap_tcd_raw_prd)"
+
+  - name: database_s3_location
+    description: "S3 location for the database (e.g. s3://prd-lh1-food-src/raw/cdp/prd/src/sap_tcd/)"
+
+  - name: database_description
+    description: "Human-readable description of the database"
+
+  - name: aws_account_id
+    description: "AWS account ID (12-digit)"
+
+  - name: region
+    description: "AWS region"
+    derivable: true
+    default: "us-east-1"
+
+  - name: data_construct
+    description: "Whether this is a Source or DataProduct database"
+    options: ["Source", "DataProduct"]
+
+  - name: data_env
+    description: "Environment"
+    options: ["dev", "prd"]
+
+  - name: data_layer
+    description: "Data layer in the lakehouse architecture"
+    options: ["raw", "raw_serving", "curated", "serving", "internal"]
+
+  - name: source_name
+    description: "Name of the source system (lowercase, e.g. sap_tcd, cdp)"
+    depends_on:
+      data_construct: "Source"
+
+  - name: data_product_name
+    description: "Name of the data product (lowercase)"
+    depends_on:
+      data_construct: "DataProduct"
+
+  - name: data_classification
+    description: "Data sensitivity classification"
+    options: ["Confidential - General Use", "Confidential - Limited", "Confidential - Restricted", "Internal"]
+    default: "Confidential - General Use"
+
+  - name: data_privacy
+    description: "Data privacy designation (e.g. None, PII)"
+    default: "None"
+
+  - name: enterprise_or_func_name
+    description: "Enterprise or functional area"
+    options: ["AGTR", "CORP", "FOOD", "SPEC"]
+
+  - name: enterprise_or_func_subgrp_name
+    description: "Subgroup within the enterprise (e.g. PRGL, ANH)"
+
+  - name: data_owner_email
+    description: "Email of the data owner"
+
+  - name: data_owner_github_uname
+    description: "GitHub username of the data owner (e.g. HarendraKanuru)"
+
+  - name: data_leader
+    description: "Data leader's name or ID (e.g. KatiePorter)"

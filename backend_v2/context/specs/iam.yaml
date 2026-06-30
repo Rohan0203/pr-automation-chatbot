@@ -1,0 +1,68 @@
+# IAM Role field specifications
+# Source: lakehouse-001/iam/*.yaml and compute-*/iam/*.yaml
+
+resource_type: iam
+description: IAM role for data access
+source_path: aws_lakehouse/*/iam/
+
+fields:
+  - name: intake_id
+    description: "Request tracking ID (e.g. M0000485)"
+
+  - name: role_name
+    description: "IAM role name (e.g. food_prgl_prd_procdataengineer)"
+
+  - name: role_description
+    description: "Human-readable description of the role's purpose"
+
+  - name: aws_account_id
+    description: "AWS account ID where the role will be created"
+
+  - name: enterprise_or_func_name
+    description: "Enterprise or functional area"
+    options: ["AGTR", "CORP", "FOOD", "SPEC"]
+
+  - name: enterprise_or_func_subgrp_name
+    description: "Subgroup (e.g. PRGL, TDA_COCOA, APAC)"
+
+  - name: role_owner
+    description: "Email of the role owner (e.g. harendra_kanuru@cargill.com)"
+
+  - name: data_env
+    description: "Environment"
+    options: ["dev", "prd"]
+
+  - name: usage_type
+    description: "Role type"
+    options: ["DataEngineer", "DataScientist", "DataAnalyst", "IngestionEngineer", "TechAnalyst"]
+
+  - name: data_leader
+    description: "Data leader's name or ID"
+
+  - name: principal_role_arn
+    description: "ARN of the principal role (e.g. arn:aws:iam::155261241286:role/prod-mif-...)"
+    required: false
+
+  - name: compute_size
+    description: "Compute size for Glue sessions"
+    options: ["XSML", "SML", "MED", "LRG", "XLRG"]
+    required: false
+
+  - name: max_session_duration
+    description: "Max session duration in hours (e.g. 2)"
+    required: false
+
+  - name: access_to_resources
+    description: "Resources this role can access: glue_databases (read/write lists) and data_prefixes (S3 paths)"
+
+  - name: enable_glue_interactive_session
+    description: "Enable Glue interactive sessions (true/false)"
+    options: ["true", "false"]
+    required: false
+    default: "false"
+
+  - name: snowflake_iceberg_support
+    description: "Enable Snowflake Iceberg support (true/false)"
+    options: ["true", "false"]
+    required: false
+    default: "false"

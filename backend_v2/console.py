@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app.models.state import Session, SessionMode, ResourceStatus
 from app.store import get_session, reset_session
 from app.orchestrator import process_message
-from app.config.field_specs import FIELD_SPECS
+from app.context.registry import get_all_field_specs
 
 
 SESSION_ID = "console-test"
@@ -60,7 +60,7 @@ def print_fields(session: Session):
 
 def print_config():
     print("\nSupported resource types:")
-    for rtype, specs in FIELD_SPECS.items():
+    for rtype, specs in get_all_field_specs().items():
         askable = [s.name for s in specs if not s.derivable]
         print(f"  {rtype}: {len(askable)} fields to collect")
         for name in askable:

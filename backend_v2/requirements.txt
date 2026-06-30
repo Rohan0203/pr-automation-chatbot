@@ -1,0 +1,11 @@
+# LLM Client
+openai==2.44.0
+
+# YAML
+pyyaml==6.0.2
+
+# Environment
+python-dotenv==1.0.1
+
+# HTTP Client
+httpx==0.28.1

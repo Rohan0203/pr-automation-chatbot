@@ -4,7 +4,7 @@ Determines which fields are askable right now for a resource.
 Groups fields across multiple resources into shared vs per-resource.
 """
 from app.models.state import Resource, FieldSpec
-from app.config.field_specs import FIELD_SPECS
+from app.context.registry import get_field_specs
 from dataclasses import dataclass
 
 
@@ -14,11 +14,6 @@ class CollectionPlan:
     shared_fields: list[FieldSpec]                        # Same field name across 2+ resources
     per_resource: dict[str, list[FieldSpec]]              # resource_type → unique fields
     all_done: bool                                        # True if nothing left to collect
-
-
-def get_field_specs(resource_type: str) -> list[FieldSpec]:
-    """Get field specs for a resource type."""
-    return FIELD_SPECS.get(resource_type, [])
 
 
 def get_askable_fields(resource: Resource) -> list[FieldSpec]:
