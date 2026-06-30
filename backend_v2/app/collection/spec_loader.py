@@ -7,12 +7,12 @@ This replaces the hardcoded field_specs.py approach.
 import yaml
 import logging
 from pathlib import Path
-from app.models.state import FieldSpec
+from app.models import FieldSpec
 
 logger = logging.getLogger(__name__)
 
-# Default location: backend_v2/context/specs/
-_DEFAULT_SPECS_DIR = Path(__file__).resolve().parent.parent.parent / "context" / "specs"
+# Default location: backend_v2/specs/
+_DEFAULT_SPECS_DIR = Path(__file__).resolve().parent.parent.parent / "specs"
 
 
 def load_resource_spec(file_path: Path) -> tuple[str, list[FieldSpec]]:

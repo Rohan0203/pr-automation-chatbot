@@ -3,8 +3,8 @@ Collector — pure logic, no LLM.
 Determines which fields are askable right now for a resource.
 Groups fields across multiple resources into shared vs per-resource.
 """
-from app.models.state import Resource, FieldSpec
-from app.context.registry import get_field_specs
+from app.models import Resource, FieldSpec
+from app.collection.spec_registry import get_field_specs
 from dataclasses import dataclass
 
 

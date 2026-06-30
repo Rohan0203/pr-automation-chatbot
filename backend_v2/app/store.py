@@ -3,7 +3,7 @@ Session store — in-memory session management.
 
 Simple dict-backed store. Replace with DB later if needed.
 """
-from app.models.state import Session, SessionMode
+from app.models import Session, SessionMode
 
 _sessions: dict[str, Session] = {}
 

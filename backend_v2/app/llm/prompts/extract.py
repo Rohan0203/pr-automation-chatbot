@@ -1,4 +1,4 @@
-"""Prompt template for the field extractor LLM call."""
+"""Prompt for field extraction during collection."""
 
 EXTRACT_PROMPT = """\
 You are extracting field values from a user's message for AWS resource configuration.

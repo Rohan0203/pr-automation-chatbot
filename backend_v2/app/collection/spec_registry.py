@@ -5,8 +5,8 @@ Loads specs from YAML files on first access and caches them.
 All other modules should use this instead of importing field_specs.py directly.
 """
 import logging
-from app.models.state import FieldSpec
-from app.context.loader import load_all_specs
+from app.models import FieldSpec
+from app.collection.spec_loader import load_all_specs
 
 logger = logging.getLogger(__name__)
 

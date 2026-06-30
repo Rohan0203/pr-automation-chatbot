@@ -1,4 +1,4 @@
-"""Prompt template for the intent + extraction LLM call."""
+"""Prompt for intent detection + initial field extraction."""
 
 INTENT_AND_EXTRACT_PROMPT = """\
 You are an assistant that helps users create AWS infrastructure configurations.

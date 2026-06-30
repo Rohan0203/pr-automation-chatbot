@@ -3,11 +3,11 @@ Orchestrator — pure code state machine.
 Routes messages based on (session.mode, resource statuses).
 Makes targeted LLM calls, updates state, returns response.
 """
-from app.models.state import Session, SessionMode, Resource, ResourceStatus
-from app.context.registry import get_field_specs, get_all_field_specs, get_supported_resources
-from app.core.collector import get_askable_fields, is_collection_complete, build_collection_plan
-from app.llm.parse import detect_intent_and_extract, extract_fields
-from app.llm.format import format_question
+from app.models import Session, SessionMode, Resource, ResourceStatus
+from app.collection.spec_registry import get_field_specs, get_all_field_specs, get_supported_resources
+from app.collection.planner import get_askable_fields, is_collection_complete, build_collection_plan
+from app.llm.intent_parser import detect_intent_and_extract, extract_fields
+from app.llm.question_formatter import format_question
 
 MAX_RETRIES = 3
 

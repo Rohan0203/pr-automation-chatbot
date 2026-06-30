@@ -2,8 +2,8 @@
 Context builder — constructs minimal LLM context for extraction/formatting.
 Only includes fields relevant to the current ask. Keeps token usage low.
 """
-from app.models.state import FieldSpec
-from app.core.collector import CollectionPlan
+from app.models import FieldSpec
+from app.collection.planner import CollectionPlan
 
 
 def build_extraction_context(plan: CollectionPlan, known_fields: dict[str, dict]) -> str:

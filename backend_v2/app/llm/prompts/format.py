@@ -1,4 +1,4 @@
-"""Prompt template for the question formatter LLM call."""
+"""Prompt for formatting questions to the user."""
 
 FORMAT_PROMPT = """\
 You are helping a user configure multiple AWS resources simultaneously. Based on the context below,

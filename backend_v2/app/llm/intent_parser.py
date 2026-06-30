@@ -2,11 +2,10 @@
 LLM parse functions — intent detection + field extraction.
 """
 from app.llm.client import chat_json
-from app.prompts.intent import INTENT_AND_EXTRACT_PROMPT
-from app.prompts.extract import EXTRACT_PROMPT
-from app.core.context_builder import build_extraction_context
-from app.core.collector import CollectionPlan
-from app.models.state import FieldSpec
+from app.llm.prompts import INTENT_AND_EXTRACT_PROMPT, EXTRACT_PROMPT
+from app.collection.context_builder import build_extraction_context
+from app.collection.planner import CollectionPlan
+from app.models import FieldSpec
 
 
 async def detect_intent_and_extract(message: str, all_field_specs: dict[str, list[FieldSpec]]) -> dict:

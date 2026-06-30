@@ -2,9 +2,9 @@
 LLM format function — builds helpful question messages for the user.
 """
 from app.llm.client import chat
-from app.prompts.format import FORMAT_PROMPT
-from app.core.context_builder import build_format_context
-from app.core.collector import CollectionPlan
+from app.llm.prompts import FORMAT_PROMPT
+from app.collection.context_builder import build_format_context
+from app.collection.planner import CollectionPlan
 
 
 async def format_question(

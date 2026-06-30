@@ -17,10 +17,12 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.models.state import Session, SessionMode, ResourceStatus
+from app.models import Session, SessionMode, ResourceStatus
 from app.store import get_session, reset_session
 from app.orchestrator import process_message
-from app.context.registry import get_all_field_specs
+from app.collection.spec_registry import get_all_field_specs
+from app.db.init_db import init_db
+from app.db.connection import close_db
 
 
 SESSION_ID = "console-test"
@@ -73,6 +75,13 @@ async def main():
     print("  Commands: /state /fields /reset /config /quit")
     print("=" * 50)
 
+    # Initialize database (creates tables if missing)
+    try:
+        await init_db()
+        print("  [DB connected]")
+    except Exception as e:
+        print(f"  [DB unavailable: {e}] — running without persistence")
+
     session = get_session(SESSION_ID)
     print_state(session)
 
@@ -115,5 +124,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        # Clean up DB connection
+        asyncio.run(close_db())
 
