@@ -10,12 +10,12 @@ def build_extraction_context(plan: CollectionPlan, known_fields: dict[str, dict]
     """Build context for the extractor LLM: what fields to look for across all resources."""
     lines = []
 
-    # Show what's already known per resource
+    # Show what's already known per resource (keyed by resource_id)
     if known_fields:
         lines.append("Already known values:")
-        for rtype, fields in known_fields.items():
+        for resource_id, fields in known_fields.items():
             if fields:
-                lines.append(f"  [{rtype}]: {', '.join(f'{k}={v}' for k, v in fields.items())}")
+                lines.append(f"  [{resource_id}]: {', '.join(f'{k}={v}' for k, v in fields.items())}")
         lines.append("")
 
     # Shared fields (ask once, apply to all)
@@ -30,10 +30,10 @@ def build_extraction_context(plan: CollectionPlan, known_fields: dict[str, dict]
             lines.append(line)
         lines.append("")
 
-    # Per-resource fields
+    # Per-resource fields (keyed by resource_id)
     if plan.per_resource:
-        for rtype, specs in plan.per_resource.items():
-            lines.append(f"Fields specific to {rtype}:")
+        for resource_id, specs in plan.per_resource.items():
+            lines.append(f"Fields specific to {resource_id}:")
             for spec in specs:
                 line = f"  - {spec.name}: {spec.description}"
                 if spec.options:
@@ -50,22 +50,22 @@ def build_format_context(plan: CollectionPlan, known_fields: dict[str, dict], er
     """Build context for the formatter LLM: what to ask the user about."""
     lines = []
     
-    # What resources are being built
-    resource_types = list(plan.per_resource.keys())
+    # What resources are being built (resource_ids)
+    resource_ids = list(plan.per_resource.keys())
     if plan.shared_fields:
-        # Get all resource types from known_fields too
-        resource_types = list(set(resource_types + list(known_fields.keys())))
-    if resource_types:
-        lines.append(f"Resources being configured: {', '.join(resource_types)}")
+        resource_ids = list(set(resource_ids + list(known_fields.keys())))
+    if resource_ids:
+        lines.append(f"Resources being configured: {', '.join(resource_ids)}")
         lines.append("")
 
-    # Show what's already known
+    # Show what's already known (keyed by resource_id)
     if known_fields:
         lines.append("Values already collected:")
-        for rtype, fields in known_fields.items():
+        for resource_id, fields in known_fields.items():
             if fields:
+                lines.append(f"  [{resource_id}]:")
                 for k, v in fields.items():
-                    lines.append(f"  ✓ {k}: {v}")
+                    lines.append(f"    ✓ {k}: {v}")
         lines.append("")
 
     if errors:
@@ -86,10 +86,10 @@ def build_format_context(plan: CollectionPlan, known_fields: dict[str, dict], er
             lines.append("".join(parts))
         lines.append("")
 
-    # Per-resource fields
+    # Per-resource fields (keyed by resource_id)
     if plan.per_resource:
-        for rtype, specs in plan.per_resource.items():
-            lines.append(f"Fields for {rtype} only:")
+        for resource_id, specs in plan.per_resource.items():
+            lines.append(f"Fields for {resource_id}:")
             for spec in specs:
                 parts = [f"  - {spec.name}: {spec.description}"]
                 if spec.options:

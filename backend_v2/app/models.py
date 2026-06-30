@@ -42,7 +42,8 @@ class FieldSpec:
 @dataclass
 class Resource:
     """A single resource being built."""
-    resource_type: str                          # "s3" or "glue_db"
+    resource_id: str                            # Unique instance ID (e.g. "s3_0", "glue_db_1")
+    resource_type: str                          # Schema type key (e.g. "s3", "glue_db")
     status: ResourceStatus = ResourceStatus.PENDING
     fields: dict[str, Any] = field(default_factory=dict)  # All known values (filled progressively)
     retry_counts: dict[str, int] = field(default_factory=dict)  # Per-field extraction failure count
@@ -85,6 +86,7 @@ class Session:
             "active_resource_idx": self.active_resource_idx,
             "resources": [
                 {
+                    "id": r.resource_id,
                     "type": r.resource_type,
                     "status": r.status.value,
                     "fields": r.fields,

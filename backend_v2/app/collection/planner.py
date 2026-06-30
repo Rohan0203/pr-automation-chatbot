@@ -11,8 +11,8 @@ from dataclasses import dataclass
 @dataclass
 class CollectionPlan:
     """What to ask the user — grouped by shared and per-resource."""
-    shared_fields: list[FieldSpec]                        # Same field name across 2+ resources
-    per_resource: dict[str, list[FieldSpec]]              # resource_type → unique fields
+    shared_fields: list[FieldSpec]                        # Same field name across 2+ resource instances
+    per_resource: dict[str, list[FieldSpec]]              # resource_id → unique fields
     all_done: bool                                        # True if nothing left to collect
 
 
@@ -56,34 +56,33 @@ def build_collection_plan(resources: list[Resource]) -> CollectionPlan:
     - shared: fields with the same name needed by 2+ resources
     - per_resource: fields unique to one resource type
     """
-    # Get askable fields per resource
+    # Get askable fields per resource (keyed by resource_id for instance uniqueness)
     per_resource_askable: dict[str, list[FieldSpec]] = {}
     for r in resources:
         if r.status.value in ("done", "dropped"):
             continue
         askable = get_askable_fields(r)
         if askable:
-            per_resource_askable[r.resource_type] = askable
+            per_resource_askable[r.resource_id] = askable
 
     if not per_resource_askable:
         return CollectionPlan(shared_fields=[], per_resource={}, all_done=True)
 
-    # If only one resource type, everything is "per_resource" (no sharing)
+    # If only one resource instance, everything is "per_resource" (no sharing)
     if len(per_resource_askable) == 1:
-        rtype = list(per_resource_askable.keys())[0]
         return CollectionPlan(
             shared_fields=[],
             per_resource=per_resource_askable,
             all_done=False,
         )
 
-    # Find shared field names (same name appears in 2+ resource types)
+    # Find shared field names (same name appears in 2+ resource instances)
     field_name_count: dict[str, int] = {}
     field_name_to_spec: dict[str, FieldSpec] = {}
-    for rtype, specs in per_resource_askable.items():
+    for rid, specs in per_resource_askable.items():
         for spec in specs:
             field_name_count[spec.name] = field_name_count.get(spec.name, 0) + 1
-            field_name_to_spec[spec.name] = spec  # keep last (they're identical across types)
+            field_name_to_spec[spec.name] = spec
 
     shared_names = {name for name, count in field_name_count.items() if count > 1}
 
@@ -92,10 +91,10 @@ def build_collection_plan(resources: list[Resource]) -> CollectionPlan:
 
     # Build per-resource (only fields NOT in shared)
     per_resource_unique: dict[str, list[FieldSpec]] = {}
-    for rtype, specs in per_resource_askable.items():
+    for rid, specs in per_resource_askable.items():
         unique = [s for s in specs if s.name not in shared_names]
         if unique:
-            per_resource_unique[rtype] = unique
+            per_resource_unique[rid] = unique
 
     return CollectionPlan(
         shared_fields=shared_fields,

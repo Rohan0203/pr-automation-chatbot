@@ -21,6 +21,7 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip().lower()
 
 # TrueFoundry config
 TFY_API_KEY = os.getenv("TRUEFOUNDRY_OPENAI_API_KEY", "")
+# TFY_MODEL = os.getenv("TRUEFOUNDRY_OPENAI_MODEL", "openai/gpt-4o-mini")
 TFY_MODEL = os.getenv("TRUEFOUNDRY_OPENAI_MODEL", "openai/gpt-4o-mini")
 TFY_BASE_URL = os.getenv("TRUEFOUNDRY_OPENAI_BASE_URL", "https://tfy-dev.aiops.cloudapps.cargill.com")
 CA_BUNDLE_PATH = os.getenv("CUSTOM_CA_BUNDLE_PATH", None)

@@ -28,7 +28,7 @@ async def flush(session: Session):
     # Update session state
     await update_session_mode(session.session_id, session.mode.value)
     resources_json = [
-        {"type": r.resource_type, "status": r.status.value, "fields": r.fields}
+        {"id": r.resource_id, "type": r.resource_type, "status": r.status.value, "fields": r.fields}
         for r in session.resources
     ]
     await update_session_resources(session.session_id, resources_json)

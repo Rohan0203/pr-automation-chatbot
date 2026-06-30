@@ -35,7 +35,7 @@ def print_state(session: Session):
     if session.resources:
         for i, r in enumerate(session.resources):
             marker = "→" if i == session.active_resource_idx else " "
-            print(f"│ {marker} [{i}] {r.resource_type} ({r.status.value})")
+            print(f"│ {marker} [{i}] {r.resource_id} ({r.status.value})")
             if r.fields:
                 for k, v in r.fields.items():
                     print(f"│       {k}: {v}")
@@ -52,7 +52,7 @@ def print_fields(session: Session):
         print("No resources yet.")
         return
     for i, r in enumerate(session.resources):
-        print(f"\n[{i}] {r.resource_type} ({r.status.value}):")
+        print(f"\n[{i}] {r.resource_id} ({r.status.value}):")
         if r.fields:
             for k, v in r.fields.items():
                 print(f"  {k}: {v}")

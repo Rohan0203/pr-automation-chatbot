@@ -35,8 +35,8 @@ Respond in JSON:
 
 For "applies_to":
 - Use "all" if the user says it's the same for all resources
-- Use the specific resource type (e.g. "s3", "glue_db") if it only applies to one
-- If the user gives different values for the same field per resource, create separate entries like "intake_id_s3" and "intake_id_glue_db"
+- Use the specific resource_id (e.g. "s3_0", "glue_db_0") if it only applies to one instance
+- If the user gives different values for the same field per resource, create separate entries like "intake_id_s3_0" and "intake_id_s3_1"
 
 Intent options:
 - "answer": user is providing field values
