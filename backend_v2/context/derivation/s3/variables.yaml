@@ -1,0 +1,49 @@
+version: 1
+resource_type: s3
+kind: derivation_variables
+source: governance_naming_convention_excerpt
+
+variables:
+  AWS_ACCT_ABBR:
+    description: Approved Minerva AWS account abbreviation used as the first token in an S3 bucket name.
+    examples:
+      - dev-lh1
+      - dev-cmp1
+      - prd-lh1
+      - prd-cmp4
+
+  OWNING_ENTITY:
+    description: Smallest accountable group used in the S3 bucket name.
+    notes:
+      - For lakehouse source buckets, this should be at enterprise or function level, not beyond.
+      - For compute data product buckets, this may go to subgroup level.
+
+  usage_type:
+    description: Purpose category of the bucket.
+    allowed_values:
+      Source: src
+      DataProduct: dp
+      Scripts: scripts
+      EngAssets: eng-assets
+
+  plat_env:
+    description: Platform environment showing where the resource is hosted.
+    allowed_values:
+      - dev
+      - prd
+    notes:
+      - For S3 bucket names, the account abbreviation already carries the environment token such as dev or prd.
+
+  enterprise_or_func_name:
+    description: Enterprise or function token used as an owning entity input.
+    allowed_values:
+      - AGTR
+      - CORP
+      - FOOD
+      - SPEC
+
+  enterprise_or_func_subgrp_name:
+    description: Subgroup token used when subgroup-level naming is allowed or required.
+    notes:
+      - In S3 names this may appear for compute-account subgroup-specific buckets.
+      - For some lakehouse bucket patterns, subgroup is not expected.

@@ -1,0 +1,18 @@
+version: 1
+resource_type: s3
+kind: derivation_description_templates
+source: governance_naming_convention_excerpt_plus_normalized_templates
+notes:
+  - The source governance text defines naming purpose and usage categories, but not exact bucket_description sentences.
+  - These templates are normalized derivation guidance for concise, consistent descriptions.
+
+templates:
+  Source: "Source bucket for [OWNING_ENTITY] data ingestion in [AWS_ACCT_ABBR]."
+  DataProduct: "Data product bucket for [OWNING_ENTITY] curated or published data in [AWS_ACCT_ABBR]."
+  Scripts: "Scripts bucket for [OWNING_ENTITY] workloads in [AWS_ACCT_ABBR]."
+  EngAssets: "Engineering assets bucket for [OWNING_ENTITY] in [AWS_ACCT_ABBR]."
+
+template_rules:
+  - Keep descriptions short and human-readable.
+  - Include owning entity and account abbreviation when available.
+  - Do not invent additional business context beyond usage type and owning entity.

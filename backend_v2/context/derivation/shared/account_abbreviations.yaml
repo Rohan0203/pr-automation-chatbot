@@ -1,0 +1,35 @@
+version: 1
+kind: shared_account_abbreviations
+source: governance_naming_convention_excerpt
+notes:
+  - This file captures approved AWS account abbreviations from governance context.
+  - Includes 12-digit account IDs for dev and prod abbreviations.
+  - Sandbox rows are intentionally excluded.
+
+account_alias_to_abbreviation:
+  minerva-dev-lakehouse-001: dev-lh1
+  minerva-dev-compute-001: dev-cmp1
+  minerva-dev-compute-002: dev-cmp2
+  minerva-dev-compute-003: dev-cmp3
+  minerva-dev-compute-004: dev-cmp4
+  minerva-prod-lakehouse-001: prd-lh1
+  minerva-prod-compute-001: prd-cmp1
+  minerva-prod-compute-002: prd-cmp2
+  minerva-prod-compute-003: prd-cmp3
+  minerva-prod-compute-004: prd-cmp4
+
+abbreviation_to_account_id:
+  dev-lh1: "438465132548"
+  dev-cmp1: "068887784423"
+  dev-cmp2: "933999308564"
+  dev-cmp3: "836901248866"
+  dev-cmp4: "324612370323"
+  prd-lh1: "578647603827"
+  prd-cmp1: "367241115350"
+  prd-cmp2: "884308299029"
+  prd-cmp3: "011379513867"
+  prd-cmp4: "632247962242"
+
+abbreviation_notes:
+  - lh1 is used for S3 bucket names in lakehouse accounts.
+  - cmp1/cmp2/cmp3/cmp4 are used for compute accounts.

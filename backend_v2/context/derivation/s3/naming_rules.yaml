@@ -1,0 +1,67 @@
+version: 1
+resource_type: s3
+kind: derivation_naming_rules
+source: governance_naming_convention_excerpt
+
+important_rules:
+  - Use lh1 for S3 bucket names in lakehouse accounts because bucket names must be globally unique.
+  - Compute accounts use cmp1, cmp2, cmp3, or cmp4 patterns.
+  - Ignore the Eligible Tags column from source governance material.
+
+suffix_mapping:
+  Source: src
+  DataProduct: dp
+  Scripts: scripts
+  EngAssets: eng-assets
+  Ops: ops
+
+bucket_patterns:
+  lakehouse_source_bucket:
+    applies_when:
+      usage_type: Source
+    pattern: "[AWS_ACCT_ABBR]-[OWNING_ENTITY]-src"
+    constraints:
+      - owning_entity should be enterprise/function level, not beyond.
+    examples:
+      - dev-lh1-corp-fin-src
+      - dev-lh1-agtr-src
+
+  compute_data_product_bucket:
+    applies_when:
+      usage_type: DataProduct
+    pattern: "[AWS_ACCT_ABBR]-[OWNING_ENTITY]-dp"
+    constraints:
+      - owning_entity can be subgroup level.
+    examples:
+      - dev-cmp1-wtg-dp
+      - dev-cmp1-wtg-cdas-dp
+      - dev-cmp2-gi-sust-dp
+
+  scripts_bucket:
+    applies_when:
+      usage_type: Scripts
+    pattern: "[AWS_ACCT_ABBR]-[OWNING_ENTITY]-scripts"
+    constraints:
+      - lakehouse: owning_entity should be enterprise/function level.
+      - compute: owning_entity may be subgroup level.
+    examples:
+      - dev-lh1-corp-fin-scripts
+      - dev-cmp1-wtg-scripts
+      - dev-cmp3-cbi-scripts
+
+  eng_assets_bucket:
+    applies_when:
+      usage_type: EngAssets
+    pattern: "[AWS_ACCT_ABBR]-[OWNING_ENTITY]-eng-assets"
+    constraints:
+      - lakehouse: owning_entity should be enterprise/function level.
+      - compute: owning_entity may be subgroup level.
+    examples:
+      - dev-lh1-corp-fin-eng-assets
+      - dev-cmp1-wtg-eng-assets
+      - dev-cmp4-salt-eng-assets
+
+derivation_guidance:
+  - Choose the pattern only from the bucket_patterns listed in this file.
+  - Build bucket_name using account abbreviation, owning entity token, and suffix mapping.
+  - Do not use deprecated source-system-specific bucket naming unless explicitly requested elsewhere.
