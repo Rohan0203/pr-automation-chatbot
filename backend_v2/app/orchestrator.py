@@ -3,14 +3,19 @@ Orchestrator — pure code state machine.
 Routes messages based on (session.mode, resource statuses).
 Makes targeted LLM calls, updates state, returns response.
 """
+import logging
+
 from app.models import Session, SessionMode, Resource, ResourceStatus
 from app.collection.spec_registry import get_field_specs, get_all_field_specs, get_supported_resources
 from app.collection.planner import get_askable_fields, is_collection_complete, build_collection_plan
+from app.collection.derivation_context_loader import load_derivation_context
 from app.llm.intent_parser import detect_intent_and_extract, extract_fields
+from app.llm.derivation import derive_resource_fields
 from app.llm.question_formatter import format_question
 from app.persistence import init_session, flush, end_session
 
 MAX_RETRIES = 3
+logger = logging.getLogger(__name__)
 
 
 async def process_message(session: Session, message: str) -> str:
@@ -174,7 +179,25 @@ async def _run_collection_cycle(session: Session, errors: dict | None = None) ->
     for r in session.resources:
         if r.status == ResourceStatus.COLLECTING and is_collection_complete(r):
             r.status = ResourceStatus.DONE
-            done_messages.append(f"✓ {r.resource_type} — all fields collected!")
+            derivation = await _derive_fields_for_resource(r)
+            derived_fields = derivation.get("derived_fields", [])
+            unresolved = derivation.get("unresolved", [])
+
+            if derived_fields and unresolved:
+                done_messages.append(
+                    f"✓ {r.resource_type} — required fields collected. Derived: {', '.join(derived_fields)}. "
+                    f"Unresolved: {', '.join(unresolved)}"
+                )
+            elif derived_fields:
+                done_messages.append(
+                    f"✓ {r.resource_type} — all fields collected. Derived: {', '.join(derived_fields)}"
+                )
+            elif unresolved:
+                done_messages.append(
+                    f"✓ {r.resource_type} — required fields collected, but could not derive: {', '.join(unresolved)}"
+                )
+            else:
+                done_messages.append(f"✓ {r.resource_type} — all fields collected!")
 
     # Persist if any resource just completed
     if done_messages:
@@ -213,3 +236,32 @@ def _apply_extracted_fields(session: Session, extracted: dict):
         for field_name, value in extracted.items():
             if field_name in spec_names:
                 resource.fields[field_name] = value
+
+
+async def _derive_fields_for_resource(resource: Resource) -> dict:
+    """Derive missing derivable fields after required collection completes."""
+    specs = get_field_specs(resource.resource_type)
+    missing_derivable = [
+        spec.name
+        for spec in specs
+        if spec.derivable and spec.name not in resource.fields
+    ]
+
+    if not missing_derivable:
+        return {"derived_fields": [], "unresolved": []}
+
+    try:
+        selected_context = load_derivation_context(resource.resource_type, missing_derivable)
+        result = await derive_resource_fields(resource, selected_context)
+    except Exception as exc:
+        logger.exception("Derivation failed for %s: %s", resource.resource_type, exc)
+        return {"derived_fields": [], "unresolved": missing_derivable}
+
+    derived_values = result.get("derived", {})
+    for field_name, value in derived_values.items():
+        resource.fields[field_name] = value
+
+    return {
+        "derived_fields": sorted(derived_values.keys()),
+        "unresolved": result.get("unresolved", []),
+    }

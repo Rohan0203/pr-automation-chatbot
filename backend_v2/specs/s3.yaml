@@ -11,12 +11,15 @@ fields:
 
   - name: bucket_name
     description: "S3 bucket name (e.g. prd-lh1-agtr-src, dev-cmp1-food-scripts)"
+    derivable: true
 
   - name: bucket_description
     description: "Human-readable purpose of the bucket"
+    derivable: true
 
   - name: aws_account_id
     description: "AWS account ID (12-digit, single-quoted in YAML)"
+    derivable: true
 
   - name: aws_region
     description: "AWS region"

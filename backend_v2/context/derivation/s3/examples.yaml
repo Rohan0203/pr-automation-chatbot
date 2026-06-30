@@ -1,0 +1,33 @@
+version: 1
+resource_type: s3
+kind: derivation_examples
+source: governance_naming_convention_excerpt
+
+examples:
+  - inputs:
+      aws_acct_abbr: dev-lh1
+      owning_entity: agtr
+      usage_type: Source
+    derived:
+      bucket_name: dev-lh1-agtr-src
+
+  - inputs:
+      aws_acct_abbr: dev-cmp1
+      owning_entity: wtg-cdas
+      usage_type: DataProduct
+    derived:
+      bucket_name: dev-cmp1-wtg-cdas-dp
+
+  - inputs:
+      aws_acct_abbr: dev-lh1
+      owning_entity: corp-fin
+      usage_type: Scripts
+    derived:
+      bucket_name: dev-lh1-corp-fin-scripts
+
+  - inputs:
+      aws_acct_abbr: dev-cmp4
+      owning_entity: salt
+      usage_type: EngAssets
+    derived:
+      bucket_name: dev-cmp4-salt-eng-assets

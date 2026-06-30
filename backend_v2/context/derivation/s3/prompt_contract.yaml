@@ -1,0 +1,30 @@
+version: 1
+resource_type: s3
+kind: derivation_prompt_contract
+
+request_contract:
+  required_inputs:
+    - requested_fields
+    - known_fields
+    - selected_context
+  optional_inputs:
+    - prior_derived_values
+
+response_contract:
+  format: json_object
+  shape:
+    derived_fields:
+      bucket_name: string_optional
+      bucket_description: string_optional
+      aws_account_id: string_optional
+      aws_region: string_optional
+    sources_used: list_of_strings
+    unresolved_fields: list_of_strings
+
+rules:
+  - Return only valid JSON.
+  - Only include fields that were requested.
+  - Use only selected context packs.
+  - Derive aws_account_id from abbreviation_to_account_id mapping when bucket/account abbreviation is known.
+  - If aws_region is not otherwise specified, use the spec default us-east-1.
+  - Do not add explanatory prose outside JSON.
