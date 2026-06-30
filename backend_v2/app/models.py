@@ -57,6 +57,7 @@ class Session:
     resources: list[Resource] = field(default_factory=list)
     active_resource_idx: int = 0
     history: list[dict] = field(default_factory=list)
+    _flushed_idx: int = field(default=0, repr=False)  # messages already persisted
 
     @property
     def active_resource(self) -> Optional[Resource]:

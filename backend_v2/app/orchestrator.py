@@ -8,6 +8,7 @@ from app.collection.spec_registry import get_field_specs, get_all_field_specs, g
 from app.collection.planner import get_askable_fields, is_collection_complete, build_collection_plan
 from app.llm.intent_parser import detect_intent_and_extract, extract_fields
 from app.llm.question_formatter import format_question
+from app.persistence import init_session, flush, end_session
 
 MAX_RETRIES = 3
 
@@ -57,14 +58,18 @@ async def _handle_idle(session: Session, message: str) -> str:
     if extracted:
         _apply_extracted_fields(session, extracted)
 
+    # Persist: session created with resources
+    await init_session(session)
+    await flush(session)
+
     # Start collection loop — ask across all resources
     return await _run_collection_cycle(session)
 
 
 async def _handle_working(session: Session, message: str) -> str:
     """In collection mode — extract fields from user response for all resources."""
-    # Build collection plan across all resources
-    active_resources = [r for r in session.resources if r.status == ResourceStatus.COLLECTING]
+    # Build collection plan across all resources (include BLOCKED so skip/drop can reach them)
+    active_resources = [r for r in session.resources if r.status in (ResourceStatus.COLLECTING, ResourceStatus.BLOCKED)]
     if not active_resources:
         session.mode = SessionMode.IDLE
         return "All resources are done!"
@@ -97,6 +102,28 @@ async def _handle_working(session: Session, message: str) -> str:
     if intent == "question":
         return "I'm here to help! Let me know the field values when you're ready. " \
                "If you want to abandon, say 'drop'."
+
+    if intent == "skip":
+        # Skip blocked fields — mark as None (deliberately skipped), unblock resource
+        for r in active_resources:
+            if r.status == ResourceStatus.BLOCKED:
+                for field_name, count in list(r.retry_counts.items()):
+                    if count >= MAX_RETRIES:
+                        r.fields[field_name] = None  # sentinel: skipped
+                        del r.retry_counts[field_name]
+                r.status = ResourceStatus.COLLECTING
+        return await _run_collection_cycle(session)
+
+    if intent == "edit":
+        # Remove extracted field names from resources so they get re-asked
+        fields_to_edit = list(extracted.keys())
+        if not fields_to_edit:
+            return "Which field would you like to change? Tell me the field name and new value."
+        for r in active_resources:
+            for fname in fields_to_edit:
+                r.fields.pop(fname, None)
+                r.retry_counts.pop(fname, None)
+        return await _run_collection_cycle(session)
 
     # Apply valid extractions to the right resources
     errors = {}
@@ -149,10 +176,15 @@ async def _run_collection_cycle(session: Session, errors: dict | None = None) ->
             r.status = ResourceStatus.DONE
             done_messages.append(f"✓ {r.resource_type} — all fields collected!")
 
+    # Persist if any resource just completed
+    if done_messages:
+        await flush(session)
+
     # Check if everything is done
     active_resources = [r for r in session.resources if r.status == ResourceStatus.COLLECTING]
     if not active_resources:
         session.mode = SessionMode.IDLE
+        await end_session(session)
         prefix = "\n".join(done_messages) + "\n\n" if done_messages else ""
         return prefix + "All resources complete! Ready for YAML generation."
 
