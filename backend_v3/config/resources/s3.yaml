@@ -1,0 +1,145 @@
+# S3 Bucket — Resource Configuration
+# Tools read this for field specs, derivation rules, and YAML generation.
+
+resource_type: s3
+display_name: "S3 Bucket"
+description: "S3 storage bucket for Minerva data lake"
+
+# Fields the user provides
+collect_fields:
+  - name: plat_env
+    label: "Environment"
+    description: "Target platform environment"
+    required: true
+    options: [dev, prd]
+    normalize:
+      development: dev
+      production: prd
+      prod: prd
+      develop: dev
+
+  - name: intake_id
+    label: "Intake ID"
+    description: "Request tracking ID (e.g. M0000485)"
+    required: true
+    validation: "^[MI][-]?\\d+$"
+
+  - name: usage_type
+    label: "Usage Type"
+    description: "Purpose category of the bucket"
+    required: true
+    options: [Source, DataProduct, Scripts, EngAssets]
+    normalize:
+      source: Source
+      src: Source
+      dataproduct: DataProduct
+      data product: DataProduct
+      dp: DataProduct
+      scripts: Scripts
+      script: Scripts
+      engassets: EngAssets
+      eng assets: EngAssets
+      eng-assets: EngAssets
+      engineering assets: EngAssets
+
+  - name: enterprise_or_func_name
+    label: "Enterprise"
+    description: "Enterprise or functional area"
+    required: true
+    options: [AGTR, CORP, FOOD, SPEC]
+    normalize:
+      agtr: AGTR
+      ag trading: AGTR
+      corp: CORP
+      corporate: CORP
+      food: FOOD
+      spec: SPEC
+      specialized: SPEC
+
+  - name: enterprise_or_func_subgrp_name
+    label: "Subgroup"
+    description: "Subgroup within the enterprise (e.g. APAC, FIN). Can be empty."
+    required: true
+    allow_empty: true
+    normalize_case: upper
+
+# Fields derived automatically (never ask user)
+derive_fields:
+  - name: bucket_name
+    label: "Bucket Name"
+    description: "DNS-compliant S3 bucket name"
+
+  - name: bucket_description
+    label: "Bucket Description"
+    description: "Human-readable purpose of the bucket"
+
+  - name: aws_account_id
+    label: "AWS Account ID"
+    description: "12-digit AWS account ID"
+
+  - name: aws_region
+    label: "AWS Region"
+    auto_value: "us-east-1"
+
+# Derivation logic (used by derive tool)
+derivation:
+  bucket_name:
+    pattern: "{plat_env}-{acct_abbr}-{entity}[-{subgrp}]-{suffix}"
+    segments:
+      plat_env: "from account abbreviation (dev or prd)"
+      acct_abbr: "from account lookup (lh1, cmp1..cmp4)"
+      entity: "lowercase(enterprise_or_func_name)"
+      subgrp: "lowercase(subgrp) — omit segment if empty"
+      suffix: "Source→src, DataProduct→dp, Scripts→scripts, EngAssets→eng-assets"
+    suffix_map:
+      Source: src
+      DataProduct: dp
+      Scripts: scripts
+      EngAssets: eng-assets
+
+  aws_account_id:
+    rules:
+      - condition: "usage_type == Source"
+        resolve: "lakehouse account for the target plat_env"
+        default_plat_env: prd
+      - condition: "usage_type == DataProduct"
+        resolve: "compute account matching enterprise"
+        default_plat_env: prd
+      - condition: "usage_type in [Scripts, EngAssets]"
+        resolve: "default to lakehouse; if enterprise has dedicated compute, use that"
+        default_plat_env: prd
+
+  bucket_description:
+    template: "{usage_type} bucket for {enterprise} {subgrp}"
+
+# YAML output rules
+yaml_output:
+  field_order:
+    - intake_id
+    - bucket_name
+    - bucket_description
+    - aws_account_id
+    - aws_region
+    - usage_type
+    - enterprise_or_func_name
+    - enterprise_or_func_subgrp_name
+    - versioning_enabled  # only if Scripts
+
+  quoting:
+    aws_account_id: single  # '578647603827'
+    bucket_description: double_if_spaces
+    enterprise_or_func_subgrp_name: double_if_empty  # ""
+    default: none
+
+  conditional_fields:
+    - field: versioning_enabled
+      include_when: "usage_type == Scripts"
+      value: true
+
+# Account constraints (which usage_type goes with which account type)
+constraints:
+  usage_type_account:
+    Source: lakehouse
+    DataProduct: compute
+    Scripts: any
+    EngAssets: any

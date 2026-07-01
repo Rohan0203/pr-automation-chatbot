@@ -1,0 +1,31 @@
+# Application settings
+app:
+  name: "MiNi"
+  version: "3.0.0"
+  description: "Minerva Infrastructure Provisioning Assistant"
+
+# LLM configuration (overridden by .env)
+llm:
+  provider: truefoundry_openai
+  model: openai/gpt-4o-mini
+  temperature: 0.1
+  max_tokens: 4096
+
+# Agent behavior
+agent:
+  max_tool_calls_per_turn: 10
+  max_fields_per_question: 4
+  history_summarize_after: 30  # messages before summarization kicks in
+
+# Database
+db:
+  path: "mini.db"
+
+# Supported resource types (add new ones here — agent auto-discovers)
+supported_resources:
+  - s3
+  # - glue_db
+  # - iam
+  # - resource_policy
+  # - smus_project
+  # - smus_role
