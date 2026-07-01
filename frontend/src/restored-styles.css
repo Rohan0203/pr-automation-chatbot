@@ -599,6 +599,7 @@ a {
 
 .msg {
   display: flex;
+  flex-wrap: wrap;
 }
 
 .msg-user {
@@ -607,6 +608,8 @@ a {
 
 .msg-assistant {
   justify-content: flex-start;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .msg-bubble {

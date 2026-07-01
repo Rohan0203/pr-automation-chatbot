@@ -1,5 +1,228 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+// ─── Structured Response Components ─────────────────────────────────────────
+
+function FieldPromptsCard({ structured, onSend }) {
+	const [selections, setSelections] = useState({})
+	const [inputValues, setInputValues] = useState({})
+	if (!structured || structured.type !== "field_prompts") return null
+	const fields = structured.fields || []
+	if (!fields.length) return null
+
+	const selectOption = (fieldName, value) => {
+		setSelections((prev) => ({ ...prev, [fieldName]: value }))
+	}
+
+	const handleSubmitAll = () => {
+		const parts = []
+		for (const field of fields) {
+			const selected = selections[field.field_name]
+			const typed = inputValues[field.field_name]?.trim()
+			if (selected) {
+				parts.push(`${field.field_name}: ${selected}`)
+			} else if (typed) {
+				parts.push(`${field.field_name}: ${typed}`)
+			} else if (field.allow_empty) {
+				// skip optional fields that are empty
+			}
+		}
+		if (parts.length > 0) {
+			onSend(parts.join(", "))
+			setSelections({})
+			setInputValues({})
+		}
+	}
+
+	const filledCount = fields.filter((f) => selections[f.field_name] || inputValues[f.field_name]?.trim()).length
+	const requiredCount = fields.filter((f) => !f.allow_empty).length
+	const filledRequired = fields.filter((f) => !f.allow_empty && (selections[f.field_name] || inputValues[f.field_name]?.trim())).length
+
+	return (
+		<div className="sc-card sc-field-prompts">
+			<div className="sc-header">
+				<span className="sc-icon">📋</span>
+				<span>Fields needed for <strong>{structured.resource_type?.toUpperCase()}</strong> resource</span>
+				<span className="sc-badge sc-badge-collecting">{filledCount}/{fields.length}</span>
+			</div>
+			<div className="sc-fields-list">
+				{fields.map((field) => {
+					const isSelected = selections[field.field_name]
+					return (
+						<div key={field.field_name} className={`sc-field-row ${isSelected ? "sc-field-done" : ""}`}>
+							<div className="sc-field-info">
+								<span className="sc-field-name">{field.label || field.field_name}</span>
+								{field.allow_empty && <span className="sc-badge sc-badge-optional">optional</span>}
+								{isSelected && <span className="sc-badge sc-badge-done">✓ {isSelected}</span>}
+							</div>
+							{!isSelected && field.description && <div className="sc-field-desc">{field.description}</div>}
+							{!isSelected && field.options && field.options.length > 0 && (
+								<div className="sc-options-group">
+									{field.options.map((opt) => {
+										const val = typeof opt === "string" ? opt : opt.value
+										const label = typeof opt === "string" ? opt : opt.label
+										const desc = typeof opt === "string" ? null : opt.description
+										return (
+											<button
+												key={val}
+												type="button"
+												className="sc-option-btn"
+												onClick={() => selectOption(field.field_name, val)}
+												title={desc || label}
+											>
+												<span className="sc-option-label">{label}</span>
+												{desc && <span className="sc-option-desc">{desc}</span>}
+											</button>
+										)
+									})}
+								</div>
+							)}
+							{!isSelected && !field.options && (
+								<div className="sc-input-row">
+									<input
+										type="text"
+										className="sc-text-input"
+										placeholder={field.placeholder || `Enter ${field.label || field.field_name}...`}
+										value={inputValues[field.field_name] || ""}
+										onChange={(e) => setInputValues((prev) => ({ ...prev, [field.field_name]: e.target.value }))}
+									/>
+									{field.allow_empty && !inputValues[field.field_name]?.trim() && (
+										<button type="button" className="sc-skip-btn" onClick={() => selectOption(field.field_name, "(empty)")}>Skip</button>
+									)}
+								</div>
+							)}
+						</div>
+					)
+				})}
+			</div>
+			<div className="sc-actions">
+				<button
+					type="button"
+					className="sc-btn-confirm"
+					onClick={handleSubmitAll}
+					disabled={filledRequired < requiredCount}
+				>
+					Submit All Fields ({filledCount}/{fields.length})
+				</button>
+			</div>
+		</div>
+	)
+}
+
+function YamlPreviewCard({ structured, onSend }) {
+	const [editValues, setEditValues] = useState({})
+	if (!structured || structured.type !== "yaml_preview") return null
+
+	const editable = new Set(structured.editable_fields || [])
+	const allFields = structured.all_fields || {}
+
+	const getVal = (key) => editValues[key] !== undefined ? editValues[key] : String(allFields[key] || "")
+	const hasEdits = Object.keys(editValues).length > 0
+
+	const handleConfirm = () => {
+		if (hasEdits) {
+			const changes = Object.entries(editValues)
+				.filter(([k, v]) => String(allFields[k] || "") !== v)
+				.map(([k, v]) => `${k}: ${v}`)
+				.join(", ")
+			if (changes) {
+				onSend(`set ${changes}, then confirm`)
+			} else {
+				onSend("confirm")
+			}
+		} else {
+			onSend("confirm")
+		}
+	}
+
+	return (
+		<div className="sc-card sc-yaml-preview">
+			<div className="sc-header">
+				<span className="sc-icon">✅</span>
+				<span>Review & Edit — <strong>{structured.resource_id}</strong></span>
+				<span className="sc-badge sc-badge-confirming">confirming</span>
+			</div>
+			<div className="sc-yaml-fields">
+				{Object.entries(allFields).map(([key, value]) => {
+					const isEditable = editable.has(key)
+					return (
+						<div key={key} className={`sc-yaml-row ${!isEditable ? "readonly" : ""}`}>
+							<span className="sc-yaml-key">{key}</span>
+							{isEditable ? (
+								<input
+									type="text"
+									className="sc-yaml-input"
+									value={getVal(key)}
+									onChange={(e) => setEditValues((prev) => ({ ...prev, [key]: e.target.value }))}
+								/>
+							) : (
+								<span className="sc-yaml-val">{String(value)}</span>
+							)}
+							{!isEditable && <span className="sc-badge sc-badge-locked">🔒</span>}
+						</div>
+					)
+				})}
+			</div>
+			<div className="sc-actions">
+				<button type="button" className="sc-btn-confirm" onClick={handleConfirm}>
+					{hasEdits ? "✓ Save Changes & Generate YAML" : "✓ Confirm & Generate YAML"}
+				</button>
+				<button type="button" className="sc-btn-cancel" onClick={() => onSend("cancel this resource")}>
+					Cancel
+				</button>
+			</div>
+		</div>
+	)
+}
+
+function ResourcePanel({ resources, onCopyYaml }) {
+	const [expanded, setExpanded] = useState({})
+	if (!resources || !resources.length) return null
+
+	const toggle = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
+
+	return (
+		<div className="sc-resource-panel">
+			{resources.map((r) => (
+				<div key={r.resource_id} className={`sc-resource-card sc-status-${r.status}`}>
+					<div className="sc-resource-header">
+						<span className="sc-resource-title">{r.title}</span>
+						<span className={`sc-badge sc-badge-${r.status}`}>{r.status}</span>
+					</div>
+					<div className="sc-resource-fields">
+						{Object.entries(r.all_fields || {}).slice(0, 4).map(([k, v]) => (
+							<div key={k} className="sc-rf">
+								<span className="sc-rf-k">{k}:</span>
+								<span className="sc-rf-v">{String(v)}</span>
+							</div>
+						))}
+						{Object.keys(r.all_fields || {}).length > 4 && (
+							<div className="sc-rf sc-rf-more">+{Object.keys(r.all_fields).length - 4} more fields</div>
+						)}
+					</div>
+					{r.yaml && (
+						<div className="sc-resource-yaml-section">
+							<button type="button" className="sc-yaml-toggle" onClick={() => toggle(r.resource_id)}>
+								{expanded[r.resource_id] ? "▾ Hide YAML" : "▸ View YAML"}
+							</button>
+							{expanded[r.resource_id] && (
+								<div className="sc-yaml-block">
+									<div className="sc-yaml-block-header">
+										<span>yaml</span>
+										<button type="button" className="sc-copy-btn" onClick={() => onCopyYaml(r.yaml)}>Copy</button>
+									</div>
+									<pre className="sc-yaml-pre">{r.yaml}</pre>
+								</div>
+							)}
+						</div>
+					)}
+				</div>
+			))}
+		</div>
+	)
+}
+
+// ─── Starter Cards ──────────────────────────────────────────────────────────
+
 const STARTER_CARDS = [
 	{
 		id: "s3",
@@ -108,6 +331,10 @@ function MessageBubble({ message, isLatest, onOptionClick }) {
 		setSelected(new Set())
 	}, [onOptionClick, selected])
 
+	const handleCopyYaml = useCallback((yaml) => {
+		navigator.clipboard.writeText(yaml).catch(() => {})
+	}, [])
+
 	return (
 		<div className={`msg msg-${message.role}`}>
 			<div className="msg-bubble" onClick={handleCopyClick}>
@@ -115,6 +342,21 @@ function MessageBubble({ message, isLatest, onOptionClick }) {
 					? <div className="markdown-body" dangerouslySetInnerHTML={{ __html: formatContent(message.content) }} />
 					: message.content}
 			</div>
+
+			{/* Structured components — only on latest assistant message */}
+			{message.role === "assistant" && isLatest && message.structured && (
+				<>
+					<FieldPromptsCard structured={message.structured} onSend={onOptionClick} />
+					<YamlPreviewCard structured={message.structured} onSend={onOptionClick} />
+				</>
+			)}
+
+			{/* Resource panel — on latest assistant message when resources exist */}
+			{message.role === "assistant" && isLatest && message.resources_summary && message.resources_summary.length > 0 && (
+				<ResourcePanel resources={message.resources_summary} onCopyYaml={handleCopyYaml} />
+			)}
+
+			{/* Legacy option buttons */}
 			{message.role === "assistant" && isLatest && Array.isArray(message.options) && message.options.length > 0 && (
 				<div className="options-grid">
 					{message.options.map((option, index) => {
@@ -392,16 +634,19 @@ export default function App() {
 				body: JSON.stringify({ message: trimmed, session_id: workingChatId }),
 			})
 
+			// Build content: just the message text (YAML shown in resource cards)
+			let content = payload.message
+
 			setMessages((current) => [
 				...current,
 				{
 					id: `assistant-${Date.now()}`,
 					role: "assistant",
-					content: payload.generated_yaml && !payload.message.includes("```")
-						? `${payload.message}\n\n\`\`\`yaml\n${payload.generated_yaml}\n\`\`\``
-						: payload.message,
+					content,
 					options: payload.options || null,
 					options_multi_select: Boolean(payload.options_multi_select),
+					structured: payload.structured || null,
+					resources_summary: payload.resources_summary || null,
 				},
 			])
 
