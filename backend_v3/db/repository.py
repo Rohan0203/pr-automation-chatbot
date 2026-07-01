@@ -10,12 +10,13 @@ from models.state import Session, Resource, Message, Preference, ResourceStatus
 
 # ─── Sessions ─────────────────────────────────────────────────────────────────
 
-async def save_session(session: Session):
+async def save_session(session: Session, title: str | None = None):
     """Upsert session metadata."""
     db = await get_db()
+    t = title or getattr(session, "title", "New Chat") or "New Chat"
     await db.execute(
-        "INSERT OR REPLACE INTO sessions (session_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
-        (session.session_id, session.user_id, session.created_at.isoformat(), datetime.utcnow().isoformat()),
+        "INSERT OR REPLACE INTO sessions (session_id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        (session.session_id, session.user_id, t, session.created_at.isoformat(), datetime.utcnow().isoformat()),
     )
     await db.commit()
 
@@ -57,6 +58,65 @@ async def load_session(session_id: str) -> Session | None:
         ))
 
     return session
+
+
+async def list_sessions(user_id: str) -> list[dict]:
+    """List all sessions for a user (for chat history sidebar)."""
+    db = await get_db()
+    rows = await db.execute_fetchall(
+        """SELECT session_id, title, created_at, updated_at,
+           (SELECT COUNT(*) FROM messages WHERE messages.session_id = sessions.session_id) as message_count
+           FROM sessions WHERE user_id = ? ORDER BY updated_at DESC""",
+        (user_id,),
+    )
+    return [
+        {
+            "id": r["session_id"],
+            "title": r["title"],
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+            "message_count": r["message_count"],
+        }
+        for r in rows
+    ]
+
+
+async def delete_session(session_id: str):
+    """Delete a session and all related data."""
+    db = await get_db()
+    await db.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+    await db.execute("DELETE FROM resources WHERE session_id = ?", (session_id,))
+    await db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+    await db.commit()
+
+
+async def update_session_title(session_id: str, title: str):
+    """Update the title of a session."""
+    db = await get_db()
+    await db.execute(
+        "UPDATE sessions SET title = ?, updated_at = ? WHERE session_id = ?",
+        (title, datetime.utcnow().isoformat(), session_id),
+    )
+    await db.commit()
+
+
+async def get_session_messages(session_id: str) -> list[dict]:
+    """Get messages for a session in API format."""
+    db = await get_db()
+    rows = await db.execute_fetchall(
+        "SELECT id, role, content, tool_calls, created_at FROM messages WHERE session_id = ? AND role IN ('user', 'assistant') ORDER BY id",
+        (session_id,),
+    )
+    return [
+        {
+            "id": r["id"],
+            "role": r["role"],
+            "content": r["content"],
+            "created_at": r["created_at"],
+            "metadata_json": None,
+        }
+        for r in rows
+    ]
 
 
 # ─── Resources ────────────────────────────────────────────────────────────────

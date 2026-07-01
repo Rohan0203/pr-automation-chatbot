@@ -102,6 +102,24 @@ async def derive_fields(resource_id: str, **kwargs) -> str:
     if not resource:
         return json.dumps({"error": f"Resource '{resource_id}' not found"})
 
+    # Guard: all required collect_fields must be present before deriving
+    config = _load_resource_config(resource.resource_type)
+    missing = []
+    for field_spec in config.get("collect_fields", []):
+        if not field_spec.get("required", False):
+            continue
+        if field_spec.get("allow_empty", False):
+            continue
+        if field_spec["name"] not in resource.collected_fields:
+            missing.append(field_spec["name"])
+
+    if missing:
+        return json.dumps({
+            "error": "Cannot derive — required fields are still missing",
+            "missing_fields": missing,
+            "resource_id": resource.resource_id,
+        })
+
     # Route to resource-specific derivation
     if resource.resource_type == "s3":
         derived = _derive_s3_fields(resource.collected_fields)

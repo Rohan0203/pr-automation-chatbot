@@ -2,25 +2,26 @@
 from __future__ import annotations
 
 import json
+from contextvars import ContextVar
 from typing import Any
 
 from models.state import Session, Resource, ResourceStatus
 from db.repository import save_resource
 
-# The active session is held in memory and injected by the agent loop
-_session: Session | None = None
+# Per-task session context — safe under concurrent async requests
+_session_var: ContextVar[Session | None] = ContextVar("_session_var", default=None)
 
 
 def bind_session(session: Session):
-    """Bind the active session for tools to operate on."""
-    global _session
-    _session = session
+    """Bind the active session for tools to operate on (async-safe per-task)."""
+    _session_var.set(session)
 
 
 def _get_session() -> Session:
-    if _session is None:
+    session = _session_var.get()
+    if session is None:
         raise RuntimeError("No active session bound")
-    return _session
+    return session
 
 
 async def get_session_state(**kwargs) -> str:
