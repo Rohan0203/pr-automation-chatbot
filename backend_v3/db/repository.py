@@ -43,6 +43,7 @@ async def load_session(session_id: str) -> Session | None:
             status=ResourceStatus(r["status"]),
             collected_fields=json.loads(r["collected_fields"]),
             derived_fields=json.loads(r["derived_fields"]),
+            user_overrides=json.loads(r["user_overrides"]) if r["user_overrides"] else {},
             yaml_output=r["yaml_output"],
         ))
 
@@ -126,8 +127,8 @@ async def save_resource(session_id: str, resource: Resource):
     db = await get_db()
     await db.execute(
         """INSERT OR REPLACE INTO resources
-           (session_id, resource_id, resource_type, status, collected_fields, derived_fields, yaml_output)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (session_id, resource_id, resource_type, status, collected_fields, derived_fields, user_overrides, yaml_output)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             session_id,
             resource.resource_id,
@@ -135,6 +136,7 @@ async def save_resource(session_id: str, resource: Resource):
             resource.status.value,
             json.dumps(resource.collected_fields),
             json.dumps(resource.derived_fields),
+            json.dumps(resource.user_overrides),
             resource.yaml_output,
         ),
     )
@@ -159,7 +161,7 @@ async def save_message(session_id: str, message: Message):
     await db.commit()
 
 
-# ─── Preferences ──────────────────────────────────────────────────────────────
+# ─── Preferences (legacy, kept for backward compat) ──────────────────────────
 
 async def save_preference(user_id: str, key: str, value: str):
     """Upsert a user preference."""
@@ -180,3 +182,28 @@ async def load_preferences(user_id: str) -> list[Preference]:
         "SELECT key, value FROM preferences WHERE user_id = ?", (user_id,)
     )
     return [Preference(key=r["key"], value=r["value"], user_id=user_id) for r in rows]
+
+
+# ─── User Profiles ───────────────────────────────────────────────────────────
+
+async def save_user_profile(user_id: str, profile: str):
+    """Upsert the user's behavioral profile."""
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO user_profiles (user_id, profile, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET profile=excluded.profile, updated_at=excluded.updated_at""",
+        (user_id, profile, datetime.utcnow().isoformat()),
+    )
+    await db.commit()
+
+
+async def load_user_profile(user_id: str) -> str | None:
+    """Load the user's behavioral profile."""
+    db = await get_db()
+    rows = await db.execute_fetchall(
+        "SELECT profile FROM user_profiles WHERE user_id = ?", (user_id,)
+    )
+    if rows and rows[0]["profile"]:
+        return rows[0]["profile"]
+    return None

@@ -23,12 +23,13 @@ class Resource:
     status: ResourceStatus = ResourceStatus.COLLECTING
     collected_fields: dict[str, Any] = field(default_factory=dict)
     derived_fields: dict[str, Any] = field(default_factory=dict)
+    user_overrides: dict[str, Any] = field(default_factory=dict)
     yaml_output: str | None = None
 
     @property
     def all_fields(self) -> dict[str, Any]:
-        """Merged view: collected + derived."""
-        return {**self.collected_fields, **self.derived_fields}
+        """Merged view: collected + derived + user overrides (overrides win)."""
+        return {**self.collected_fields, **self.derived_fields, **self.user_overrides}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -37,6 +38,7 @@ class Resource:
             "status": self.status.value,
             "collected_fields": self.collected_fields,
             "derived_fields": self.derived_fields,
+            "user_overrides": self.user_overrides,
             "yaml_output": self.yaml_output,
         }
 

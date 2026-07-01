@@ -60,3 +60,35 @@ async def drop_resource(resource_id: str, **kwargs) -> str:
     resource.status = ResourceStatus.DROPPED
     await save_resource(session.session_id, resource)
     return json.dumps({"dropped": resource.resource_id})
+
+
+async def clone_resource(source_resource_id: str, overrides: dict | None = None, **kwargs) -> str:
+    """Clone a resource from an existing one, optionally overriding specific fields."""
+    session = _get_session()
+    source = session.get_resource(source_resource_id)
+
+    if not source:
+        return json.dumps({"error": f"Source resource '{source_resource_id}' not found"})
+
+    # Create new resource of the same type
+    rid = session.next_resource_id(source.resource_type)
+    new_resource = Resource(resource_id=rid, resource_type=source.resource_type)
+
+    # Copy collected fields from source
+    new_resource.collected_fields = dict(source.collected_fields)
+
+    # Apply overrides
+    if overrides:
+        for k, v in overrides.items():
+            new_resource.collected_fields[k] = v
+
+    session.resources.append(new_resource)
+    await save_resource(session.session_id, new_resource)
+
+    return json.dumps({
+        "cloned_from": source.resource_id,
+        "new_resource_id": rid,
+        "resource_type": source.resource_type,
+        "collected_fields": new_resource.collected_fields,
+        "status": "collecting",
+    })

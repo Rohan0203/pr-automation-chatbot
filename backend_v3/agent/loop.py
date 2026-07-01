@@ -1,4 +1,4 @@
-"""Agent loop — ReAct-style tool-calling loop."""
+"""Agent loop — ReAct-style tool-calling loop with guardrails."""
 from __future__ import annotations
 
 import json
@@ -9,36 +9,84 @@ from models.state import Session, Message
 from agent.context_builder import build_system_prompt, build_conversation_messages
 from services.llm import chat_with_tools
 from tools.registry import TOOL_FUNCTIONS, TOOL_SCHEMAS
-from db.repository import load_preferences, save_message
+from db.repository import load_user_profile, save_message
 
 logger = logging.getLogger(__name__)
 
 MAX_TOOL_ITERATIONS = 10
 
 
+async def _auto_inject_state(llm_messages: list[dict]) -> None:
+    """Guardrail: pre-call get_session_state so LLM always starts with fresh truth."""
+    state_fn = TOOL_FUNCTIONS["get_session_state"]
+    state_json = await state_fn()
+    llm_messages.append({
+        "role": "system",
+        "content": f"[Auto-injected current state]\n{state_json}",
+    })
+
+
+async def _auto_derive_if_complete(
+    tool_name: str, tool_result: str, llm_messages: list[dict], tool_call_id: str
+) -> str:
+    """Guardrail: if set_fields returns collection_complete, auto-trigger derive_fields.
+    Returns the enriched tool result (with derive results appended), or original if no derive needed."""
+    if tool_name != "set_fields":
+        return tool_result
+
+    try:
+        result_data = json.loads(tool_result)
+    except json.JSONDecodeError:
+        return tool_result
+
+    if not result_data.get("collection_complete"):
+        return tool_result
+
+    resource_id = result_data.get("resource_id")
+    if not resource_id:
+        return tool_result
+
+    derive_fn = TOOL_FUNCTIONS.get("derive_fields")
+    if not derive_fn:
+        return tool_result
+
+    logger.info(f"Guardrail: auto-deriving fields for {resource_id}")
+    derive_result = await derive_fn(resource_id=resource_id)
+
+    # Merge derive result into the set_fields result so LLM sees one coherent tool response
+    try:
+        derive_data = json.loads(derive_result)
+        result_data["auto_derived"] = derive_data
+    except json.JSONDecodeError:
+        result_data["auto_derived"] = derive_result
+
+    return json.dumps(result_data)
+
+
 async def run_agent_turn(session: Session, user_message: str) -> str:
     """
     Process one user message through the agent loop.
 
-    1. Add user message to session
-    2. Build context (system prompt + conversation history)
-    3. Loop: call LLM → if tool_calls, execute them and feed results back → repeat
-    4. When LLM responds with content (no tool_calls), return that as the response
+    Guardrails (code-enforced, not prompt-dependent):
+    1. Auto-inject current session state before first LLM call
+    2. Auto-trigger derive_fields when set_fields returns collection_complete
     """
     # Record user message
     session.add_message("user", user_message)
     await save_message(session.session_id, session.messages[-1])
 
-    # Load user preferences for context
-    preferences = await load_preferences(session.user_id)
+    # Load user profile for context
+    profile = await load_user_profile(session.user_id)
 
     # Build system prompt
-    system_prompt = build_system_prompt(session, preferences)
+    system_prompt = build_system_prompt(session, profile)
 
     # Build message history for LLM
-    # We maintain a running list for this turn (includes tool call/result messages)
     llm_messages: list[dict] = [{"role": "system", "content": system_prompt}]
     llm_messages.extend(build_conversation_messages(session))
+
+    # Guardrail 1: auto-inject fresh state
+    await _auto_inject_state(llm_messages)
 
     # Agent loop
     for iteration in range(MAX_TOOL_ITERATIONS):
@@ -53,7 +101,6 @@ async def run_agent_turn(session: Session, user_message: str) -> str:
             return content
 
         # Has tool calls — execute them
-        # First, add assistant message with tool_calls to the LLM messages
         llm_messages.append(response)
 
         for tool_call in response["tool_calls"]:
@@ -75,6 +122,9 @@ async def run_agent_turn(session: Session, user_message: str) -> str:
                     result = json.dumps({"error": str(e)})
 
             # Add tool result to LLM messages
+            # Guardrail 2: auto-derive if collection just completed (enriches the result)
+            result = await _auto_derive_if_complete(func_name, result, llm_messages, tool_call["id"])
+
             llm_messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call["id"],
@@ -83,7 +133,7 @@ async def run_agent_turn(session: Session, user_message: str) -> str:
 
             logger.debug(f"Tool: {func_name}({args}) → {result[:200]}")
 
-    # Exceeded max iterations — force a response
+    # Exceeded max iterations
     session.add_message("assistant", "I'm having trouble processing this. Could you rephrase?")
     await save_message(session.session_id, session.messages[-1])
     return session.messages[-1].content

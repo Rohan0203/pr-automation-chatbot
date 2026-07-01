@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -58,15 +59,28 @@ def _normalize_value(field_name: str, value: Any, config: dict) -> Any:
                 return normalize_map[lookup]
 
         # If has options, try case-insensitive match
+        # Options can be plain strings or dicts with "value" key
         options = field_spec.get("options", [])
         if options:
-            for opt in options:
+            option_values = _extract_option_values(options)
+            for opt in option_values:
                 if opt.lower() == str_value.lower():
                     return opt
 
         break
 
     return str_value
+
+
+def _extract_option_values(options: list) -> list[str]:
+    """Extract option values from either plain strings or dicts with 'value' key."""
+    values = []
+    for opt in options:
+        if isinstance(opt, dict):
+            values.append(opt["value"])
+        else:
+            values.append(str(opt))
+    return values
 
 
 async def set_fields(resource_id: str, fields: dict, **kwargs) -> str:
@@ -92,8 +106,16 @@ async def set_fields(resource_id: str, fields: dict, **kwargs) -> str:
             None,
         )
         if field_spec and field_spec.get("options"):
-            if normalized not in field_spec["options"]:
-                errors[field_name] = f"Must be one of: {field_spec['options']}"
+            option_values = _extract_option_values(field_spec["options"])
+            if normalized not in option_values:
+                errors[field_name] = f"Must be one of: {option_values}"
+                continue
+
+        # Regex validation (e.g. intake_id pattern)
+        if field_spec:
+            validation = field_spec.get("validation")
+            if validation and not re.match(validation, str(normalized)):
+                errors[field_name] = f"Invalid format. Must match pattern: {validation}"
                 continue
 
         resource.collected_fields[field_name] = normalized
@@ -112,6 +134,7 @@ async def set_fields(resource_id: str, fields: dict, **kwargs) -> str:
     await save_resource(session.session_id, resource)
 
     result = {
+        "resource_id": resource.resource_id,
         "set": set_fields_result,
         "errors": errors if errors else None,
         "collection_complete": all_collected,
@@ -139,3 +162,55 @@ async def get_resource_info(resource_type: str, **kwargs) -> str:
         summary = ""
 
     return context_md + summary
+
+
+async def edit_derived_field(resource_id: str, field_name: str, value: str, **kwargs) -> str:
+    """Edit a derived field (user override). Validates against editability rules in config."""
+    session = _get_session()
+    resource = session.get_resource(resource_id)
+
+    if not resource:
+        return json.dumps({"error": f"Resource '{resource_id}' not found"})
+
+    if resource.status not in (ResourceStatus.CONFIRMING, ResourceStatus.COLLECTING):
+        return json.dumps({"error": f"Cannot edit — resource status is {resource.status.value}"})
+
+    config = _load_resource_config(resource.resource_type)
+    if not config:
+        return json.dumps({"error": f"No config for resource type '{resource.resource_type}'"})
+
+    # Find the derive field spec
+    derive_spec = next(
+        (f for f in config.get("derive_fields", []) if f["name"] == field_name),
+        None,
+    )
+    if not derive_spec:
+        return json.dumps({"error": f"'{field_name}' is not a derived field"})
+
+    editable = derive_spec.get("editable", "locked")
+    if editable == "locked":
+        return json.dumps({"error": f"'{field_name}' is locked and cannot be edited"})
+
+    # Validate constrained fields
+    if editable == "constrained":
+        validation = derive_spec.get("validation")
+        if validation and not re.match(validation, str(value)):
+            return json.dumps({"error": f"Invalid format for {field_name}. Must match: {validation}"})
+
+    # Validate free fields
+    if editable == "free":
+        max_length = derive_spec.get("max_length", 256)
+        if len(str(value)) > max_length:
+            return json.dumps({"error": f"'{field_name}' exceeds max length of {max_length}"})
+
+    # Store as user override
+    resource.user_overrides[field_name] = value
+    await save_resource(session.session_id, resource)
+
+    return json.dumps({
+        "resource_id": resource.resource_id,
+        "field": field_name,
+        "old_value": resource.derived_fields.get(field_name),
+        "new_value": value,
+        "source": "user_override",
+    })

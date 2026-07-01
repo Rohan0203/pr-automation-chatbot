@@ -11,7 +11,13 @@ collect_fields:
     label: "Environment"
     description: "Target platform environment"
     required: true
-    options: [dev, prd]
+    options:
+      - value: dev
+        label: Dev
+        description: "Development / testing"
+      - value: prd
+        label: Prod
+        description: "Production"
     normalize:
       development: dev
       production: prd
@@ -22,13 +28,26 @@ collect_fields:
     label: "Intake ID"
     description: "Request tracking ID (e.g. M0000485)"
     required: true
-    validation: "^[MI][-]?\\d+$"
+    placeholder: "e.g. M021213"
+    validation: "^[A-Za-z]\\d+$"
 
   - name: usage_type
     label: "Usage Type"
     description: "Purpose category of the bucket"
     required: true
-    options: [Source, DataProduct, Scripts, EngAssets]
+    options:
+      - value: Source
+        label: Source
+        description: "Raw data ingestion from external systems"
+      - value: DataProduct
+        label: Data Product
+        description: "Curated data for consumption"
+      - value: Scripts
+        label: Scripts
+        description: "ETL/processing scripts and code"
+      - value: EngAssets
+        label: Eng Assets
+        description: "Engineering artifacts and configs"
     normalize:
       source: Source
       src: Source
@@ -46,7 +65,19 @@ collect_fields:
     label: "Enterprise"
     description: "Enterprise or functional area"
     required: true
-    options: [AGTR, CORP, FOOD, SPEC]
+    options:
+      - value: AGTR
+        label: AGTR
+        description: "Agriculture & Trading"
+      - value: CORP
+        label: CORP
+        description: "Corporate"
+      - value: FOOD
+        label: FOOD
+        description: "Food & Bio Industrial"
+      - value: SPEC
+        label: SPEC
+        description: "Specialized Nutrition"
     normalize:
       agtr: AGTR
       ag trading: AGTR
@@ -61,6 +92,7 @@ collect_fields:
     description: "Subgroup within the enterprise (e.g. APAC, FIN). Can be empty."
     required: true
     allow_empty: true
+    placeholder: "e.g. APAC, FIN, PRGL (or leave empty)"
     normalize_case: upper
 
 # Fields derived automatically (never ask user)
@@ -68,18 +100,24 @@ derive_fields:
   - name: bucket_name
     label: "Bucket Name"
     description: "DNS-compliant S3 bucket name"
+    editable: constrained
+    validation: "^[a-z0-9][a-z0-9\\-]{2,62}$"
 
   - name: bucket_description
     label: "Bucket Description"
     description: "Human-readable purpose of the bucket"
+    editable: free
+    max_length: 256
 
   - name: aws_account_id
     label: "AWS Account ID"
     description: "12-digit AWS account ID"
+    editable: locked
 
   - name: aws_region
     label: "AWS Region"
     auto_value: "us-east-1"
+    editable: locked
 
 # Derivation logic (used by derive tool)
 derivation:

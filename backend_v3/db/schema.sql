@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS resources (
     status TEXT NOT NULL DEFAULT 'collecting',
     collected_fields TEXT NOT NULL DEFAULT '{}',
     derived_fields TEXT NOT NULL DEFAULT '{}',
+    user_overrides TEXT NOT NULL DEFAULT '{}',
     yaml_output TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(session_id, resource_id)
@@ -37,4 +38,10 @@ CREATE TABLE IF NOT EXISTS preferences (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(user_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY,
+    profile TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

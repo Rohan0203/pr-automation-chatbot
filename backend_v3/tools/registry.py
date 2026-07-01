@@ -6,11 +6,11 @@ from __future__ import annotations
 
 from typing import Callable, Any
 
-from tools.session_tools import get_session_state, create_resources, drop_resource
-from tools.field_tools import set_fields, get_resource_info
+from tools.session_tools import get_session_state, create_resources, drop_resource, clone_resource
+from tools.field_tools import set_fields, get_resource_info, edit_derived_field
 from tools.derive_tools import derive_fields
 from tools.generate_tools import generate_yaml
-from tools.preference_tools import save_preference
+from tools.preference_tools import update_user_profile
 
 # ─── Tool function map ────────────────────────────────────────────────────────
 
@@ -18,11 +18,13 @@ TOOL_FUNCTIONS: dict[str, Callable] = {
     "get_session_state": get_session_state,
     "create_resources": create_resources,
     "drop_resource": drop_resource,
+    "clone_resource": clone_resource,
     "set_fields": set_fields,
     "get_resource_info": get_resource_info,
+    "edit_derived_field": edit_derived_field,
     "derive_fields": derive_fields,
     "generate_yaml": generate_yaml,
-    "save_preference": save_preference,
+    "update_user_profile": update_user_profile,
 }
 
 # ─── OpenAI tool schemas ─────────────────────────────────────────────────────
@@ -32,7 +34,7 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "get_session_state",
-            "description": "Get the current session state including all resources and their statuses/fields. Call this at the start of every turn.",
+            "description": "Get the current session state including all resources and their statuses/fields. State is auto-injected each turn, but call this if you need a refresh.",
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -83,8 +85,29 @@ TOOL_SCHEMAS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "clone_resource",
+            "description": "Clone a new resource from an existing one, copying all collected fields. Optionally override specific fields. Use when user says 'same as previous but change X'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "source_resource_id": {
+                        "type": "string",
+                        "description": "ID of the resource to clone from (e.g. 's3_0')",
+                    },
+                    "overrides": {
+                        "type": "object",
+                        "description": "Fields to override in the clone (e.g. {\"enterprise_or_func_name\": \"CORP\"})",
+                    },
+                },
+                "required": ["source_resource_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "set_fields",
-            "description": "Set collected field values on a resource after extracting from user message. Handles normalization internally.",
+            "description": "Set collected field values on a resource after extracting from user message. Handles normalization and validation. When all required fields are set, derivation runs automatically.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -121,8 +144,33 @@ TOOL_SCHEMAS: list[dict] = [
     {
         "type": "function",
         "function": {
+            "name": "edit_derived_field",
+            "description": "Edit a derived field value (e.g. bucket_name, bucket_description). Only works on fields marked as 'constrained' or 'free'. Locked fields (aws_account_id, aws_region) cannot be changed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "resource_id": {
+                        "type": "string",
+                        "description": "ID of the resource",
+                    },
+                    "field_name": {
+                        "type": "string",
+                        "description": "Name of the derived field to edit",
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "New value for the field",
+                    },
+                },
+                "required": ["resource_id", "field_name", "value"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "derive_fields",
-            "description": "Derive computable fields (bucket_name, account_id, etc.) from collected values. Call after all user-provided fields are set.",
+            "description": "Derive computable fields (bucket_name, account_id, etc.) from collected values. Normally auto-triggered — call manually only if you need to re-derive after a field change.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -155,21 +203,17 @@ TOOL_SCHEMAS: list[dict] = [
     {
         "type": "function",
         "function": {
-            "name": "save_preference",
-            "description": "Save a user preference for future sessions (e.g. response style, fields per turn). Call when user expresses a lasting preference.",
+            "name": "update_user_profile",
+            "description": "Update the user's behavioral profile based on observed patterns. Call after productive interactions to record: preferred enterprise, typical usage, interaction style, common field defaults. Profile is a cumulative natural language description.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "key": {
+                    "profile": {
                         "type": "string",
-                        "description": "Preference key (e.g. 'fields_per_turn', 'tone', 'verbosity')",
-                    },
-                    "value": {
-                        "type": "string",
-                        "description": "Preference value (e.g. '2', 'concise', 'detailed')",
+                        "description": "Full updated profile text (replaces previous). Include all prior observations plus new ones.",
                     },
                 },
-                "required": ["key", "value"],
+                "required": ["profile"],
             },
         },
     },

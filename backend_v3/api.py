@@ -9,7 +9,9 @@ import uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Any
 
+import yaml
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -25,6 +27,8 @@ from db.repository import (
 )
 from tools.session_tools import bind_session
 from agent.loop import run_agent_turn
+
+_CONFIG_DIR = Path(__file__).resolve().parent / "config"
 
 
 # ─── Lifespan ─────────────────────────────────────────────────────────────────
@@ -156,7 +160,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest, request: Request):
-    """Process a user message through the agent and return the response."""
+    """Process a user message through the agent and return a structured response."""
     user = _get_user(request)
     session_id = body.session_id
     message = body.message.strip()
@@ -177,10 +181,14 @@ async def chat(body: ChatRequest, request: Request):
     response = await run_agent_turn(session, message)
 
     # Update title if this is the first real message
-    if len(session.messages) <= 2:  # user + assistant
+    if len(session.messages) <= 2:
         await update_session_title(session_id, _generate_title(message))
 
-    # Check if any resource has YAML generated
+    # Build structured response with post-processing
+    structured = _build_structured_data(session)
+    resources_summary = _build_resources_summary(session)
+
+    # Check for generated YAML
     generated_yaml = None
     for r in session.resources:
         if r.status == ResourceStatus.DONE and r.yaml_output:
@@ -192,10 +200,137 @@ async def chat(body: ChatRequest, request: Request):
         "session_id": session_id,
         "chat_title": _generate_title(message),
         "generated_yaml": generated_yaml,
-        "options": None,
-        "options_multi_select": False,
+        "structured": structured,
+        "resources_summary": resources_summary,
         "updated_at": datetime.utcnow().isoformat(),
     }
+
+
+# ─── Post-processing: build structured data from session state ────────────────
+
+def _load_resource_config(resource_type: str) -> dict | None:
+    path = _CONFIG_DIR / "resources" / f"{resource_type}.yaml"
+    if not path.exists():
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _build_resources_summary(session: Session) -> list[dict]:
+    """Build a compact resources summary for the frontend sidebar/cards."""
+    summary = []
+    for r in session.resources:
+        if r.status == ResourceStatus.DROPPED:
+            continue
+
+        # Build a short title
+        usage = r.collected_fields.get("usage_type", "")
+        enterprise = r.collected_fields.get("enterprise_or_func_name", "")
+        subgrp = r.collected_fields.get("enterprise_or_func_subgrp_name", "")
+        parts = [r.resource_type.upper()]
+        if usage:
+            parts.append(usage)
+        if enterprise:
+            label = enterprise
+            if subgrp:
+                label += f" {subgrp}"
+            parts.append(f"({label})")
+        title = " — ".join(parts[:2]) + (f" {parts[2]}" if len(parts) > 2 else "")
+
+        entry: dict[str, Any] = {
+            "resource_id": r.resource_id,
+            "resource_type": r.resource_type,
+            "status": r.status.value,
+            "title": title,
+            "collected_fields": r.collected_fields,
+            "derived_fields": r.derived_fields,
+            "user_overrides": r.user_overrides,
+            "all_fields": r.all_fields,
+        }
+
+        if r.status == ResourceStatus.DONE and r.yaml_output:
+            entry["yaml"] = r.yaml_output
+
+        summary.append(entry)
+    return summary
+
+
+def _build_structured_data(session: Session) -> dict | None:
+    """Post-process session state to build structured data for the frontend.
+    
+    Returns the most relevant structured payload based on current state:
+    - yaml_preview: if any resource is in confirming state
+    - resource_carousel: if multiple resources exist
+    - None: if no special rendering needed
+    """
+    active = [r for r in session.resources if r.status != ResourceStatus.DROPPED]
+
+    # Check for confirming resources → yaml_preview
+    confirming = [r for r in active if r.status == ResourceStatus.CONFIRMING]
+    if confirming:
+        resource = confirming[0]
+        config = _load_resource_config(resource.resource_type)
+        editable_fields = []
+        readonly_fields = []
+
+        if config:
+            for df in config.get("derive_fields", []):
+                edit_level = df.get("editable", "locked")
+                if edit_level in ("constrained", "free"):
+                    editable_fields.append(df["name"])
+                else:
+                    readonly_fields.append(df["name"])
+            # Collected fields are always editable
+            for cf in config.get("collect_fields", []):
+                editable_fields.append(cf["name"])
+
+        return {
+            "type": "yaml_preview",
+            "resource_id": resource.resource_id,
+            "resource_type": resource.resource_type,
+            "all_fields": resource.all_fields,
+            "editable_fields": editable_fields,
+            "readonly_fields": readonly_fields,
+        }
+
+    # Check for collecting resources → field_prompts with options
+    collecting = [r for r in active if r.status == ResourceStatus.COLLECTING]
+    if collecting:
+        resource = collecting[0]
+        config = _load_resource_config(resource.resource_type)
+        if config:
+            missing_fields = []
+            for fs in config.get("collect_fields", []):
+                if fs["name"] not in resource.collected_fields:
+                    field_info: dict[str, Any] = {
+                        "field_name": fs["name"],
+                        "label": fs.get("label", fs["name"]),
+                        "description": fs.get("description", ""),
+                    }
+                    if fs.get("options"):
+                        field_info["options"] = fs["options"]
+                    if fs.get("placeholder"):
+                        field_info["placeholder"] = fs["placeholder"]
+                    if fs.get("allow_empty"):
+                        field_info["allow_empty"] = True
+                    missing_fields.append(field_info)
+
+            if missing_fields:
+                return {
+                    "type": "field_prompts",
+                    "resource_id": resource.resource_id,
+                    "resource_type": resource.resource_type,
+                    "fields": missing_fields,
+                }
+
+    # Multiple active resources → carousel
+    if len(active) > 1:
+        return {
+            "type": "resource_carousel",
+            "count": len(active),
+        }
+
+    return None
 
 
 # ─── Run ──────────────────────────────────────────────────────────────────────

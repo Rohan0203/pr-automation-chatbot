@@ -3,28 +3,33 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from models.state import Session, Preference
+from models.state import Session
 
 _CONTEXT_DIR = Path(__file__).resolve().parent.parent / "context"
 
 
-def build_system_prompt(session: Session, preferences: list[Preference]) -> str:
+def build_system_prompt(session: Session, user_profile: str | None) -> str:
     """
     Build the full system prompt by combining:
-    1. Base system prompt (agent.md)
-    2. User preferences (if any)
+    1. Base system prompt (system.md)
+    2. User profile (behavioral description, if any)
     3. Supported resource types hint
     """
     # 1. Base system prompt
     system_md = (_CONTEXT_DIR / "system.md").read_text(encoding="utf-8")
 
-    # 2. User preferences
-    pref_section = ""
-    if preferences:
-        pref_lines = [f"- {p.key}: {p.value}" for p in preferences]
-        pref_section = (
-            "\n\n# User Preferences (always respect these)\n"
-            + "\n".join(pref_lines)
+    # 2. User profile
+    profile_section = ""
+    if user_profile:
+        profile_section = (
+            "\n\n# User Profile (adapt your style to this user)\n"
+            + user_profile
+        )
+    else:
+        profile_section = (
+            "\n\n# User Profile\n"
+            "No profile yet — this is a new user. Observe their behavior and update the profile "
+            "after a productive interaction using `update_user_profile`."
         )
 
     # 3. Supported resources
@@ -36,7 +41,7 @@ def build_system_prompt(session: Session, preferences: list[Preference]) -> str:
         f"Call `get_resource_info` with the type to learn its fields."
     )
 
-    return system_md + pref_section + resource_hint
+    return system_md + profile_section + resource_hint
 
 
 def build_conversation_messages(session: Session) -> list[dict]:
