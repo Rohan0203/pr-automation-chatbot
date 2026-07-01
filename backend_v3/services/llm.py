@@ -5,7 +5,7 @@ import os
 import json
 import httpx
 from pathlib import Path
-from openai import AsyncOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 from dotenv import load_dotenv
 
 # Load .env from backend_v3 root
@@ -13,16 +13,21 @@ _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(_env_path)
 
 # Configuration from env
+_PROVIDER = os.getenv("LLM_PROVIDER", "truefoundry_openai").strip().lower()
 _MODEL = os.getenv("TRUEFOUNDRY_OPENAI_MODEL", "openai/gpt-4o-mini")
 _API_KEY = os.getenv("TRUEFOUNDRY_OPENAI_API_KEY", "")
 _BASE_URL = os.getenv("TRUEFOUNDRY_OPENAI_BASE_URL", "https://tfy-dev.aiops.cloudapps.cargill.com")
-_CA_BUNDLE = os.getenv("CUSTOM_CA_BUNDLE_PATH", None)
+_AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
+_AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+_AZURE_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
+_AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
+_CA_BUNDLE = os.getenv("CUSTOM_CA_BUNDLE_PATH") or None
 _TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
 
-_client: AsyncOpenAI | None = None
+_client: AsyncOpenAI | AsyncAzureOpenAI | None = None
 
 
-def _get_client() -> AsyncOpenAI:
+def _get_client() -> AsyncOpenAI | AsyncAzureOpenAI:
     """Lazy-init the OpenAI client."""
     global _client
     if _client is None:
@@ -31,14 +36,22 @@ def _get_client() -> AsyncOpenAI:
             os.environ.pop(key, None)
 
         http_client = None
-        if _CA_BUNDLE:
+        if _CA_BUNDLE and Path(_CA_BUNDLE).exists():
             http_client = httpx.AsyncClient(verify=_CA_BUNDLE)
 
-        _client = AsyncOpenAI(
-            api_key=_API_KEY,
-            base_url=_BASE_URL,
-            http_client=http_client,
-        )
+        if _PROVIDER == "azure":
+            _client = AsyncAzureOpenAI(
+                api_key=_AZURE_API_KEY,
+                azure_endpoint=_AZURE_ENDPOINT,
+                api_version=_AZURE_API_VERSION,
+                http_client=http_client,
+            )
+        else:
+            _client = AsyncOpenAI(
+                api_key=_API_KEY,
+                base_url=_BASE_URL,
+                http_client=http_client,
+            )
     return _client
 
 
@@ -58,8 +71,9 @@ async def chat_with_tools(
     """
     client = _get_client()
 
+    model = _AZURE_DEPLOYMENT if _PROVIDER == "azure" else _MODEL
     kwargs = {
-        "model": _MODEL,
+        "model": model,
         "messages": messages,
         "temperature": _TEMPERATURE,
     }

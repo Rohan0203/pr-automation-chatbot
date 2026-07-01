@@ -34,6 +34,35 @@ def _load_resource_config(resource_type: str) -> dict:
         return yaml.safe_load(f)
 
 
+def _find_account(accounts: list[dict], *, account_type: str, plat_env: str, enterprise: str | None = None) -> dict | None:
+    for account in accounts:
+        if account.get("type") != account_type:
+            continue
+        if account.get("plat_env") != plat_env:
+            continue
+        if enterprise is not None and account.get("enterprise") != enterprise:
+            continue
+        return account
+    return None
+
+
+def _normalize_layer_token(data_layer: str) -> str:
+    layer = str(data_layer or "").strip().lower()
+    if layer == "cur":
+        return "curated"
+    if layer == "srv":
+        return "serving"
+    return layer
+
+
+def _gluedb_name_prefix(enterprise: str, subgroup: str) -> str:
+    enterprise_lc = enterprise.lower()
+    subgroup_lc = subgroup.lower()
+    if enterprise in {"CORP", "SPEC"} and subgroup_lc:
+        return subgroup_lc
+    return enterprise_lc
+
+
 def _derive_s3_fields(collected: dict[str, Any]) -> dict[str, Any]:
     """Derive S3-specific fields from collected values."""
     derived = {}
@@ -94,6 +123,53 @@ def _derive_s3_fields(collected: dict[str, Any]) -> dict[str, Any]:
     return derived
 
 
+def _derive_gluedb_fields(collected: dict[str, Any]) -> dict[str, Any]:
+    derived = {}
+    accounts = _load_accounts()
+
+    data_construct = collected.get("data_construct", "")
+    data_env = collected.get("data_env", "")
+    data_layer = _normalize_layer_token(collected.get("data_layer", ""))
+    enterprise = collected.get("enterprise_or_func_name", "")
+    subgroup = collected.get("enterprise_or_func_subgrp_name", "")
+    source_name = str(collected.get("source_name", "")).lower()
+    data_product_name = str(collected.get("data_product_name", "")).lower()
+
+    entity_bucket = enterprise.lower()
+    subgrp_bucket = subgroup.lower()
+    name_prefix = _gluedb_name_prefix(enterprise, subgroup)
+
+    derived["region"] = "us-east-1"
+
+    if data_construct == "Source":
+        account = _find_account(accounts, account_type="lakehouse", plat_env=data_env)
+        plat_env = account.get("abbreviation", f"{data_env}-lh1") if account else f"{data_env}-lh1"
+        derived["aws_account_id"] = account.get("id", "UNKNOWN") if account else "UNKNOWN"
+        derived["database_name"] = f"lh_{source_name}_{data_layer}_{data_env}"
+        bucket_name = f"{plat_env}-{entity_bucket}-src"
+        if enterprise == "CORP" and subgrp_bucket:
+            bucket_name = f"{plat_env}-{entity_bucket}-{subgrp_bucket}-src"
+        derived["database_s3_location"] = f"s3://{bucket_name}/{data_layer}/{data_env}/src/{source_name}/"
+    else:
+        account = _find_account(accounts, account_type="compute", plat_env=data_env, enterprise=enterprise)
+        compute_abbr = account.get("abbreviation", f"{data_env}-cmp") if account else f"{data_env}-cmp"
+        derived["aws_account_id"] = account.get("id", "UNKNOWN") if account else "UNKNOWN"
+        derived["database_name"] = f"{name_prefix}_{data_product_name}_{data_layer}_{data_env}"
+
+        if enterprise == "CORP" and subgrp_bucket:
+            bucket_scope = f"corp-{subgrp_bucket}"
+            path_scope = subgrp_bucket
+        else:
+            bucket_scope = subgrp_bucket or entity_bucket
+            path_scope = subgrp_bucket or entity_bucket
+
+        derived["database_s3_location"] = (
+            f"s3://{compute_abbr}-{bucket_scope}-dp/{data_layer}/{data_env}/{path_scope}/{data_product_name}/"
+        )
+
+    return derived
+
+
 async def derive_fields(resource_id: str, **kwargs) -> str:
     """Derive computable fields for a resource."""
     session = _get_session()
@@ -123,6 +199,8 @@ async def derive_fields(resource_id: str, **kwargs) -> str:
     # Route to resource-specific derivation
     if resource.resource_type == "s3":
         derived = _derive_s3_fields(resource.collected_fields)
+    elif resource.resource_type in {"gluedb", "glue_db"}:
+        derived = _derive_gluedb_fields(resource.collected_fields)
     else:
         derived = {}
 

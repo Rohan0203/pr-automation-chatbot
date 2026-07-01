@@ -65,6 +65,51 @@ def _generate_s3_yaml(all_fields: dict[str, Any], config: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _condition_matches(condition: str, all_fields: dict[str, Any]) -> bool:
+    if "==" not in condition:
+        return False
+    field_name, expected = condition.split("==", 1)
+    field_name = field_name.strip()
+    expected = expected.strip().strip('"').strip("'")
+    return str(all_fields.get(field_name, "")) == expected
+
+
+def _format_yaml_value(field_name: str, value: Any, quoting: dict[str, str]) -> str:
+    quote_rule = quoting.get(field_name, quoting.get("default", "none"))
+    if quote_rule == "double":
+        return f'"{value}"'
+    if quote_rule == "single":
+        return f"'{value}'"
+    return str(value)
+
+
+def _generate_ordered_yaml(all_fields: dict[str, Any], config: dict) -> str:
+    yaml_config = config.get("yaml_output", {})
+    field_order = yaml_config.get("field_order", [])
+    quoting = yaml_config.get("quoting", {})
+    conditional = yaml_config.get("conditional_fields", [])
+
+    lines = []
+    for field_name in field_order:
+        include_field = True
+        for cond in conditional:
+            if cond.get("field") != field_name:
+                continue
+            include_field = _condition_matches(cond.get("include_when", ""), all_fields)
+            break
+
+        if not include_field:
+            continue
+
+        value = all_fields.get(field_name)
+        if value is None or value == "":
+            continue
+
+        lines.append(f"{field_name}: {_format_yaml_value(field_name, value, quoting)}")
+
+    return "\n".join(lines) + "\n"
+
+
 async def generate_yaml(resource_id: str, **kwargs) -> str:
     """Generate YAML for a confirmed resource."""
     session = _get_session()
@@ -82,6 +127,8 @@ async def generate_yaml(resource_id: str, **kwargs) -> str:
     # Route to resource-specific generator
     if resource.resource_type == "s3":
         yaml_output = _generate_s3_yaml(all_fields, config)
+    elif resource.resource_type in {"gluedb", "glue_db"}:
+        yaml_output = _generate_ordered_yaml(all_fields, config)
     else:
         # Generic: just dump fields in order
         yaml_output = pyyaml.dump(all_fields, default_flow_style=False)

@@ -1,0 +1,276 @@
+# Glue Database — Resource Configuration
+# Tools read this for field specs, derivation rules, and YAML generation.
+
+resource_type: gluedb
+display_name: "Glue Database"
+description: "AWS Glue database for Minerva data lake datasets"
+
+# Fields the user provides
+collect_fields:
+  - name: intake_id
+    label: "Intake ID"
+    description: "Request tracking ID (e.g. M0000501)"
+    required: true
+    placeholder: "e.g. M021213"
+    validation: "^[A-Za-z]\\d+$"
+
+  - name: data_construct
+    label: "Data Construct"
+    description: "Whether the database is for a source system or a data product"
+    required: true
+    options:
+      - value: Source
+        label: Source
+        description: "Raw or source-serving data from source systems"
+      - value: DataProduct
+        label: Data Product
+        description: "Curated, serving, or internal data product datasets"
+    normalize:
+      source: Source
+      src: Source
+      dataproduct: DataProduct
+      data product: DataProduct
+      dp: DataProduct
+
+  - name: data_env
+    label: "Data Environment"
+    description: "Lifecycle stage of the data"
+    required: true
+    options:
+      - value: dev
+        label: Dev
+      - value: qa
+        label: QA
+      - value: stg
+        label: Staging
+      - value: prd
+        label: Prod
+    normalize:
+      development: dev
+      production: prd
+      prod: prd
+      stage: stg
+      staging: stg
+
+  - name: data_layer
+    label: "Data Layer"
+    description: "Logical layer for the database"
+    required: true
+    options:
+      - value: raw
+        label: Raw
+      - value: raw_serving
+        label: Raw Serving
+      - value: curated
+        label: Curated
+      - value: serving
+        label: Serving
+      - value: internal
+        label: Internal
+    normalize:
+      raw serving: raw_serving
+      raw-serving: raw_serving
+      cur: curated
+      srv: serving
+
+  - name: enterprise_or_func_name
+    label: "Enterprise"
+    description: "Enterprise or functional area"
+    required: true
+    options:
+      - value: AGTR
+        label: AGTR
+        description: "Agriculture & Trading"
+      - value: CORP
+        label: CORP
+        description: "Corporate"
+      - value: FOOD
+        label: FOOD
+        description: "Food & Bio Industrial"
+      - value: SPEC
+        label: SPEC
+        description: "Specialized Nutrition"
+    normalize:
+      agtr: AGTR
+      ag trading: AGTR
+      corp: CORP
+      corporate: CORP
+      food: FOOD
+      spec: SPEC
+      specialized: SPEC
+
+  - name: enterprise_or_func_subgrp_name
+    label: "Subgroup"
+    description: "Subgroup within the enterprise (e.g. APAC, FIN, ANH)"
+    required: true
+    allow_empty: true
+    placeholder: "e.g. APAC, FIN, ANH"
+    normalize_case: upper
+
+  - name: source_name
+    label: "Source Name"
+    description: "Source system token for Source databases"
+    required: false
+    placeholder: "e.g. axapta, bestmix, jdee1"
+    validation: "^[a-z0-9_]+$"
+
+  - name: data_product_name
+    label: "Data Product Name"
+    description: "Data product token for DataProduct databases"
+    required: false
+    placeholder: "e.g. general_ledger, master_data"
+    validation: "^[a-z0-9_]+$"
+
+  - name: database_description
+    label: "Database Description"
+    description: "Human-readable purpose of the database"
+    required: true
+    max_length: 256
+
+  - name: data_classification
+    label: "Data Classification"
+    description: "Governance classification tag"
+    required: true
+    options:
+      - value: Confidential - Restricted
+        label: Confidential - Restricted
+      - value: Confidential - Limited
+        label: Confidential - Limited
+      - value: Confidential - General Use
+        label: Confidential - General Use
+      - value: Internal
+        label: Internal
+      - value: Public
+        label: Public
+
+  - name: data_privacy
+    label: "Data Privacy"
+    description: "Governance privacy tag"
+    required: true
+    options:
+      - value: PII
+        label: PII
+      - value: PI
+        label: PI
+      - value: SPI
+        label: SPI
+      - value: BCI
+        label: BCI
+      - value: None
+        label: None
+      - value: NONE
+        label: NONE
+
+  - name: data_owner_email
+    label: "Data Owner Email"
+    description: "Cargill email of the data owner"
+    required: true
+
+  - name: data_owner_github_uname
+    label: "Data Owner GitHub Username"
+    description: "GitHub username of the data owner"
+    required: true
+
+  - name: data_leader
+    label: "Data Leader"
+    description: "Minerva governance lead or PSID"
+    required: true
+
+# Fields derived automatically (never ask user)
+derive_fields:
+  - name: database_name
+    label: "Database Name"
+    description: "Glue database name derived from construct, layer, env, and source or product"
+    editable: constrained
+    validation: "^[a-z0-9_]+$"
+
+  - name: database_s3_location
+    label: "Database S3 Location"
+    description: "S3 prefix backing the Glue database"
+    editable: constrained
+
+  - name: aws_account_id
+    label: "AWS Account ID"
+    description: "12-digit AWS account ID"
+    editable: locked
+
+  - name: region
+    label: "AWS Region"
+    auto_value: "us-east-1"
+    editable: locked
+
+# Derivation logic (used by derive tool)
+derivation:
+  database_name:
+    source_patterns:
+      raw: "lh_{source_name}_raw_{plat_env}"
+      raw_serving: "lh_{source_name}_raw_serving_{plat_env}"
+      internal: "lh_{source_name}_internal_{plat_env}"
+    data_product_patterns:
+      curated: "{name_prefix}_{data_product_name}_curated_{plat_env}"
+      serving: "{name_prefix}_{data_product_name}_serving_{plat_env}"
+      internal: "{name_prefix}_{data_product_name}_internal_{plat_env}"
+    segments:
+      name_prefix: "CORP and SPEC use lowercase subgroup when present; AGTR and FOOD use lowercase enterprise"
+      source_name: "lowercase(source_name)"
+      data_product_name: "lowercase(data_product_name)"
+
+  aws_account_id:
+    rules:
+      - condition: "data_construct == Source"
+        resolve: "lakehouse account for the data environment"
+      - condition: "data_construct == DataProduct"
+        resolve: "compute account matching enterprise for the data environment"
+
+  database_s3_location:
+    source_patterns:
+      raw: "s3://{plat_env}-lh1-{entity_bucket}[-{subgrp_bucket}]-src/raw/{data_env}/src/{source_name}/"
+      raw_serving: "s3://{plat_env}-lh1-{entity_bucket}[-{subgrp_bucket}]-src/raw_serving/{data_env}/src/{source_name}/"
+      internal: "s3://{plat_env}-lh1-{entity_bucket}[-{subgrp_bucket}]-src/internal/{data_env}/src/{source_name}/"
+    data_product_patterns:
+      curated: "s3://{compute_abbr}-{bucket_scope}-dp/curated/{data_env}/{path_scope}/{data_product_name}/"
+      serving: "s3://{compute_abbr}-{bucket_scope}-dp/serving/{data_env}/{path_scope}/{data_product_name}/"
+      internal: "s3://{compute_abbr}-{bucket_scope}-dp/internal/{data_env}/{path_scope}/{data_product_name}/"
+
+# YAML output rules
+yaml_output:
+  field_order:
+    - intake_id
+    - database_name
+    - database_s3_location
+    - database_description
+    - aws_account_id
+    - region
+    - data_construct
+    - data_env
+    - data_layer
+    - source_name
+    - data_product_name
+    - data_classification
+    - data_privacy
+    - enterprise_or_func_name
+    - enterprise_or_func_subgrp_name
+    - data_owner_email
+    - data_owner_github_uname
+    - data_leader
+
+  quoting:
+    aws_account_id: preserve
+    database_s3_location: double
+    database_description: preserve
+    data_classification: preserve
+    data_privacy: preserve
+    data_owner_email: preserve
+    default: none
+
+  conditional_fields:
+    - field: source_name
+      include_when: "data_construct == Source"
+    - field: data_product_name
+      include_when: "data_construct == DataProduct"
+
+# Account constraints
+constraints:
+  construct_account:
+    Source: lakehouse
+    DataProduct: compute

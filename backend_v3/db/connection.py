@@ -1,6 +1,7 @@
 """Async SQLite connection manager."""
 from __future__ import annotations
 
+import asyncio
 import aiosqlite
 from pathlib import Path
 
@@ -32,6 +33,12 @@ async def init_db():
     schema_path = Path(__file__).parent / "schema.sql"
     schema = schema_path.read_text(encoding="utf-8")
     await db.executescript(schema)
+
+    resource_columns = await db.execute_fetchall("PRAGMA table_info(resources)")
+    resource_column_names = {row["name"] for row in resource_columns}
+    if "user_overrides" not in resource_column_names:
+        await db.execute("ALTER TABLE resources ADD COLUMN user_overrides TEXT NOT NULL DEFAULT '{}' ")
+
     await db.commit()
 
 
@@ -39,5 +46,9 @@ async def close_db():
     """Close the database connection."""
     global _connection
     if _connection:
-        await _connection.close()
+        connection = _connection
         _connection = None
+        try:
+            await asyncio.shield(connection.close())
+        except asyncio.CancelledError:
+            pass
