@@ -125,11 +125,32 @@ async def set_fields(resource_id: str, fields: dict, **kwargs) -> str:
     all_collected = True
     missing = []
     for field_spec in config.get("collect_fields", []):
-        if field_spec.get("required", False):
-            if field_spec["name"] not in resource.collected_fields:
-                if not field_spec.get("allow_empty", False) or field_spec["name"] not in resource.collected_fields:
-                    all_collected = False
-                    missing.append(field_spec["name"])
+        field_name_spec = field_spec["name"]
+
+        # Determine if this field is actually required given current state
+        is_required = field_spec.get("required", False)
+        allow_empty = field_spec.get("allow_empty", False)
+
+        # Handle required_when: field is required only when condition is met
+        required_when = field_spec.get("required_when")
+        if required_when and not is_required:
+            # Parse "field_name == value" condition
+            if " == " in required_when:
+                cond_field, cond_value = required_when.split(" == ", 1)
+                cond_field = cond_field.strip()
+                cond_value = cond_value.strip()
+                actual = resource.collected_fields.get(cond_field, "")
+                if str(actual).strip() == cond_value:
+                    is_required = True
+                    allow_empty = False
+
+        if not is_required:
+            continue
+        if allow_empty:
+            continue
+        if field_name_spec not in resource.collected_fields:
+            all_collected = False
+            missing.append(field_name_spec)
 
     await save_resource(session.session_id, resource)
 

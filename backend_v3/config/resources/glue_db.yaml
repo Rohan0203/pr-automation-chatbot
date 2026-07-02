@@ -1,0 +1,314 @@
+# Glue Database — Resource Configuration
+# Tools read this for field specs, derivation rules, and YAML generation.
+
+resource_type: glue_db
+display_name: "Glue Database"
+description: "AWS Glue Database for Minerva Lakehouse or Compute accounts"
+
+# Fields the user provides
+collect_fields:
+  - name: plat_env
+    label: "Platform Environment"
+    description: "Target platform environment"
+    group: identity
+    required: true
+    options:
+      - value: dev
+        label: Dev
+        description: "Development / testing"
+      - value: prd
+        label: Prod
+        description: "Production"
+      - value: snd
+        label: Sandbox
+        description: "Sandbox / experimentation"
+    normalize:
+      development: dev
+      production: prd
+      prod: prd
+      develop: dev
+      sandbox: snd
+
+  - name: intake_id
+    label: "Intake ID"
+    description: "Request tracking ID (e.g. M0000451)"
+    group: identity
+    required: true
+    placeholder: "e.g. M0000451"
+    validation: "^[MI]\\d+$"
+
+  - name: data_construct
+    label: "Data Construct"
+    description: "Whether this DB holds source data or a data product"
+    group: identity
+    required: true
+    options:
+      - value: Source
+        label: Source
+        description: "Source-system data (raw/raw_serving layers)"
+      - value: DataProduct
+        label: Data Product
+        description: "Curated or serving data products"
+    normalize:
+      source: Source
+      src: Source
+      dataproduct: DataProduct
+      data product: DataProduct
+      dp: DataProduct
+
+  - name: data_layer
+    label: "Data Layer"
+    description: "Which logical layer the database belongs to"
+    group: identity
+    required: true
+    options:
+      - value: raw
+        label: Raw
+        description: "Unprocessed source data"
+      - value: raw_serving
+        label: Raw Serving
+        description: "Cleaned/serving copy of raw data"
+      - value: curated
+        label: Curated
+        description: "Transformed, business-ready data"
+      - value: serving
+        label: Serving
+        description: "Exposed for downstream consumption"
+      - value: internal
+        label: Internal
+        description: "Internal processing / staging"
+    normalize:
+      rawserving: raw_serving
+      raw serving: raw_serving
+
+  - name: data_env
+    label: "Data Environment"
+    description: "Data environment tag (often same as plat_env, but can differ)"
+    group: identity
+    required: true
+    options:
+      - value: dev
+        label: Dev
+        description: "Development data"
+      - value: prd
+        label: Prod
+        description: "Production data"
+      - value: qa
+        label: QA
+        description: "Quality assurance"
+      - value: stg
+        label: Staging
+        description: "Pre-production staging"
+      - value: snd
+        label: Sandbox
+        description: "Sandbox data"
+    normalize:
+      production: prd
+      prod: prd
+      development: dev
+      staging: stg
+      sandbox: snd
+
+  - name: source_name
+    label: "Source Name"
+    description: "Governance-approved source system name (e.g. cdp, concur, sap_tc1, jdee1)"
+    group: identity
+    required: true
+    placeholder: "e.g. cdp, concur, sap_tc1, jdee1, iiq"
+    normalize_case: lower
+
+  - name: enterprise_or_func_name
+    label: "Enterprise"
+    description: "Enterprise or functional area"
+    group: identity
+    required: true
+    options:
+      - value: AGTR
+        label: AGTR
+        description: "Agriculture & Trading"
+      - value: CORP
+        label: CORP
+        description: "Corporate"
+      - value: FOOD
+        label: FOOD
+        description: "Food & Bio Industrial"
+      - value: SPEC
+        label: SPEC
+        description: "Specialized Nutrition"
+    normalize:
+      agtr: AGTR
+      ag trading: AGTR
+      corp: CORP
+      corporate: CORP
+      food: FOOD
+      spec: SPEC
+      specialized: SPEC
+
+  - name: enterprise_or_func_subgrp_name
+    label: "Subgroup"
+    description: "Subgroup within the enterprise (e.g. FIN, DTD, APAC). Required for CORP."
+    group: identity
+    required: false
+    allow_empty: true
+    required_when: "enterprise_or_func_name == CORP"
+    placeholder: "e.g. FIN, DTD, APAC, LATAM (required for CORP)"
+    normalize_case: upper
+
+  - name: data_owner_email
+    label: "Data Owner Email"
+    description: "Cargill email of the data owner"
+    group: ownership
+    required: true
+    placeholder: "e.g. john_doe@cargill.com"
+    validation: "^[a-zA-Z0-9_.+-]+@cargill\\.com$"
+
+  - name: data_owner_github_uname
+    label: "Data Owner GitHub Username"
+    description: "Cargill GitHub Enterprise username of the data owner"
+    group: ownership
+    required: true
+    placeholder: "e.g. JohnDoe"
+
+  - name: data_leader
+    label: "Data Leader"
+    description: "Name or PSID of the data leader"
+    group: ownership
+    required: true
+    placeholder: "e.g. k745239 or Jane Smith"
+
+# Fields derived automatically (never ask user)
+derive_fields:
+  - name: database_name
+    label: "Database Name"
+    description: "Glue database name following naming conventions"
+    editable: constrained
+    validation: "^[a-z0-9_]+$"
+
+  - name: database_s3_location
+    label: "S3 Location"
+    description: "S3 URI pointing to the database's data root"
+    editable: constrained
+
+  - name: database_description
+    label: "Database Description"
+    description: "Human-readable one-liner describing the database"
+    editable: free
+    max_length: 256
+
+  - name: aws_account_id
+    label: "AWS Account ID"
+    description: "12-digit AWS account ID"
+    editable: locked
+
+  - name: region
+    label: "Region"
+    auto_value: "us-east-1"
+    editable: locked
+
+# Derivation logic (used by derive tool)
+derivation:
+  module: glue_db
+
+  database_name:
+    patterns:
+      lakehouse_raw: "lh_{cdp_prefix}{source_name}_{instance_suffix}{data_layer}_{plat_env}"
+      lakehouse_raw_serving: "lh_{source_name}_{instance_suffix}{data_layer}_{plat_env}"
+      compute_curated: "{owning_entity}_{product_name}_{data_layer}_{plat_env}"
+      compute_serving: "{owning_entity}_{product_name}_{data_layer}_{purpose}_{plat_env}"
+    rules:
+      - "Lakehouse DBs MUST start with lh_"
+      - "If source_name == cdp, include 'cdp' after lh_: lh_cdp_{src}_{layer}_{env}"
+      - "source_name token MUST appear in database_name for raw/raw_serving"
+      - "Lowercase snake_case only (a-z0-9_)"
+      - "Database name is IMMUTABLE after creation"
+
+  database_s3_location:
+    patterns:
+      raw_non_cdp: "s3://{plat_env}-lh1-{entity}[-{subgrp}]-src/raw/current/{data_env}/src/{source_name}/"
+      raw_cdp: "s3://{plat_env}-lh1-{entity}[-{subgrp}]-src/raw/cdp/{data_env}/src/{source_name}/"
+      raw_serving: "s3://{plat_env}-lh1-{entity}[-{subgrp}]-src/raw_serving/{data_env}/src/{source_name}/"
+      curated: "s3://{plat_env}-cmpN-{subgrp}-dp/curated/{data_env}/{entity}/{product}/"
+      serving: "s3://{plat_env}-cmpN-{subgrp}-dp/serving/{data_env}/{entity}/{product}/{purpose}/"
+    rules:
+      - "Bucket must match enterprise_or_func_name (and subgroup for CORP)"
+      - "plat_env in URI must match the account's environment"
+      - "source segment must equal source_name"
+      - "Trailing slash required"
+      - "Lowercase only"
+
+  aws_account_id:
+    rules:
+      - condition: "data_construct == Source"
+        resolve: "lakehouse account for the plat_env"
+      - condition: "data_construct == DataProduct"
+        resolve: "compute account for enterprise and plat_env"
+
+  database_description:
+    template: "Store data from {source_name} source system"
+
+# Validations run after derivation
+validations:
+  - name: source_in_name
+    type: contains
+    check_field: database_name
+    must_contain_field: source_name
+    when: "data_layer in [raw, raw_serving]"
+    error: "Raw/raw_serving DB name must contain the source_name"
+
+  - name: cdp_in_name
+    type: contains
+    check_field: database_name
+    must_contain: "cdp"
+    when: "source_name == cdp"
+    error: "CDP source requires 'cdp' token in database name after 'lh_'"
+
+  - name: lh_prefix
+    type: starts_with
+    check_field: database_name
+    prefix: "lh_"
+    when: "data_construct == Source"
+    error: "Lakehouse database names must start with 'lh_'"
+
+  - name: subgrp_for_corp
+    type: required_if
+    field: enterprise_or_func_subgrp_name
+    when: "enterprise_or_func_name == CORP"
+    error: "CORP enterprise requires a subgroup"
+
+  - name: name_format
+    type: regex
+    check_field: database_name
+    pattern: "^[a-z0-9_]+$"
+    error: "Database name must be lowercase snake_case (a-z0-9_ only)"
+
+# YAML output rules
+yaml_output:
+  field_order:
+    - intake_id
+    - database_name
+    - database_s3_location
+    - database_description
+    - aws_account_id
+    - region
+    - data_construct
+    - data_env
+    - data_layer
+    - source_name
+    - enterprise_or_func_name
+    - enterprise_or_func_subgrp_name
+    - data_owner_email
+    - data_owner_github_uname
+    - data_leader
+
+  quoting:
+    aws_account_id: single
+    database_s3_location: double
+    database_description: double
+    enterprise_or_func_subgrp_name: double_if_empty
+    default: none
+
+# Account constraints
+constraints:
+  data_construct_account:
+    Source: lakehouse
+    DataProduct: compute

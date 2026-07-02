@@ -3,13 +3,30 @@ from __future__ import annotations
 
 import json
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any
+
+import yaml as pyyaml
 
 from models.state import Session, Resource, ResourceStatus
 from db.repository import save_resource
 
 # Per-task session context — safe under concurrent async requests
 _session_var: ContextVar[Session | None] = ContextVar("_session_var", default=None)
+
+_CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+_supported_resources: list[str] | None = None
+
+
+def _load_supported_resources() -> list[str]:
+    """Load supported resource types from settings.yaml."""
+    global _supported_resources
+    if _supported_resources is None:
+        path = _CONFIG_DIR / "settings.yaml"
+        with open(path, "r", encoding="utf-8") as f:
+            data = pyyaml.safe_load(f)
+        _supported_resources = data.get("supported_resources", [])
+    return _supported_resources
 
 
 def bind_session(session: Session):
@@ -33,11 +50,21 @@ async def get_session_state(**kwargs) -> str:
 async def create_resources(resources: list[dict], **kwargs) -> str:
     """Create new resources and add them to the session."""
     session = _get_session()
+    supported = _load_supported_resources()
     created = []
+    errors = []
 
     for spec in resources:
         rtype = spec.get("resource_type", "").strip().lower()
         if not rtype:
+            continue
+
+        # Scope control: reject unsupported resource types
+        if rtype not in supported:
+            errors.append({
+                "resource_type": rtype,
+                "error": f"'{rtype}' is not supported yet. Currently available: {', '.join(supported)}",
+            })
             continue
 
         rid = session.next_resource_id(rtype)
@@ -46,7 +73,10 @@ async def create_resources(resources: list[dict], **kwargs) -> str:
         await save_resource(session.session_id, resource)
         created.append({"resource_id": rid, "resource_type": rtype, "status": "collecting"})
 
-    return json.dumps({"created": created})
+    result = {"created": created}
+    if errors:
+        result["errors"] = errors
+    return json.dumps(result)
 
 
 async def drop_resource(resource_id: str, **kwargs) -> str:

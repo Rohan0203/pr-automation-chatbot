@@ -65,6 +65,34 @@ def _generate_s3_yaml(all_fields: dict[str, Any], config: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _generate_glue_db_yaml(all_fields: dict[str, Any], config: dict) -> str:
+    """Generate Glue DB YAML following field order and quoting rules."""
+    yaml_config = config.get("yaml_output", {})
+    field_order = yaml_config.get("field_order", [])
+    quoting = yaml_config.get("quoting", {})
+
+    lines = []
+
+    for field_name in field_order:
+        value = all_fields.get(field_name)
+        if value is None:
+            continue
+
+        # Apply quoting rules
+        quote_rule = quoting.get(field_name, quoting.get("default", "none"))
+
+        if quote_rule == "single":
+            lines.append(f"{field_name}: '{value}'")
+        elif quote_rule == "double":
+            lines.append(f'{field_name}: "{value}"')
+        elif quote_rule == "double_if_empty" and value == "":
+            lines.append(f'{field_name}: ""')
+        else:
+            lines.append(f"{field_name}: {value}")
+
+    return "\n".join(lines) + "\n"
+
+
 async def generate_yaml(resource_id: str, **kwargs) -> str:
     """Generate YAML for a confirmed resource."""
     session = _get_session()
@@ -82,6 +110,8 @@ async def generate_yaml(resource_id: str, **kwargs) -> str:
     # Route to resource-specific generator
     if resource.resource_type == "s3":
         yaml_output = _generate_s3_yaml(all_fields, config)
+    elif resource.resource_type == "glue_db":
+        yaml_output = _generate_glue_db_yaml(all_fields, config)
     else:
         # Generic: just dump fields in order
         yaml_output = pyyaml.dump(all_fields, default_flow_style=False)

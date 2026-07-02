@@ -219,73 +219,75 @@
 	color: var(--mw-text);
 }
 
-/* ── YAML Preview Card ─────────────────────────────────────── */
-.sc-yaml-fields {
-	padding: 6px 0;
+/* ── YAML Editor Card ──────────────────────────────────────── */
+.sc-yaml-editor {
+	overflow: hidden;
 }
 
-.sc-yaml-row {
+.sc-yaml-tab {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 6px 16px;
-	font-size: 13px;
-	transition: background 0.1s;
+	gap: 8px;
+	padding: 10px 16px;
+	background: #1e1e1e;
+	border-bottom: 1px solid #333;
 }
 
-.sc-yaml-row:hover {
-	background: var(--mw-light);
+.sc-yaml-tab-icon {
+	font-size: 14px;
 }
 
-.sc-yaml-row.readonly {
-	opacity: 0.6;
-}
-
-.sc-yaml-key {
+.sc-yaml-tab-name {
 	font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 	font-size: 12px;
-	color: var(--mw-primary);
-	min-width: 200px;
-	flex-shrink: 0;
+	color: #ccc;
+	font-weight: 500;
 }
 
-.sc-yaml-val {
-	font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-	font-size: 12px;
-	color: var(--mw-text);
-	flex: 1;
+.sc-yaml-editor-body {
+	background: #1e1e1e;
+	padding: 0;
 }
 
-.sc-yaml-input {
-	flex: 1;
-	font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
-	font-size: 12px;
-	color: var(--mw-text);
-	padding: 4px 8px;
-	border: 1px solid var(--mw-border);
-	border-radius: 6px;
-	background: var(--mw-bg);
-	outline: none;
-	transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.sc-yaml-input:focus {
-	border-color: var(--mw-primary);
-	box-shadow: 0 0 0 2px rgba(0, 132, 61, 0.1);
-}
-
-.sc-edit-btn {
-	background: none;
+.sc-yaml-textarea {
+	width: 100%;
 	border: none;
-	cursor: pointer;
+	outline: none;
+	resize: vertical;
+	padding: 16px 20px;
+	font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
 	font-size: 13px;
-	padding: 2px 4px;
-	opacity: 0;
-	transition: opacity 0.15s;
+	line-height: 1.7;
+	color: #d4d4d4;
+	background: #1e1e1e;
+	tab-size: 2;
+	white-space: pre;
+	overflow-x: auto;
+	min-height: 160px;
+	box-sizing: border-box;
 }
 
-.sc-yaml-row:hover .sc-edit-btn {
-	opacity: 1;
+.sc-yaml-textarea:focus {
+	outline: none;
+}
+
+.sc-yaml-footer {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 12px 16px;
+	border-top: 1px solid var(--mw-border);
+	background: var(--mw-surface);
+}
+
+.sc-yaml-hint {
+	font-size: 11px;
+	color: var(--mw-muted);
+}
+
+.sc-yaml-footer .sc-actions {
+	padding: 0;
+	border-top: none;
 }
 
 /* ── Action Buttons ────────────────────────────────────────── */

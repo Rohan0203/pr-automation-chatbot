@@ -109,66 +109,93 @@ function FieldPromptsCard({ structured, onSend }) {
 }
 
 function YamlPreviewCard({ structured, onSend }) {
-	const [editValues, setEditValues] = useState({})
+	const [yamlText, setYamlText] = useState("")
+	const [initialized, setInitialized] = useState(false)
+
 	if (!structured || structured.type !== "yaml_preview") return null
 
-	const editable = new Set(structured.editable_fields || [])
+	const readonlySet = new Set(structured.readonly_fields || [])
 	const allFields = structured.all_fields || {}
+	const resourceId = structured.resource_id || "resource"
+	const resourceType = structured.resource_type || ""
 
-	const getVal = (key) => editValues[key] !== undefined ? editValues[key] : String(allFields[key] || "")
-	const hasEdits = Object.keys(editValues).length > 0
+	// Build initial YAML text from all_fields on first render
+	if (!initialized && Object.keys(allFields).length > 0) {
+		const lines = Object.entries(allFields).map(([key, value]) => {
+			const strVal = String(value ?? "")
+			// Quote logic: account IDs get single quotes, empty strings get double quotes
+			if (key === "aws_account_id" || key === "aws_region") {
+				return `${key}: '${strVal}'`
+			} else if (strVal === "") {
+				return `${key}: ""`
+			} else if (strVal.includes(" ") || strVal.includes(":") || strVal.includes("#")) {
+				return `${key}: "${strVal}"`
+			}
+			return `${key}: ${strVal}`
+		})
+		setYamlText(lines.join("\n"))
+		setInitialized(true)
+	}
 
 	const handleConfirm = () => {
-		if (hasEdits) {
-			const changes = Object.entries(editValues)
-				.filter(([k, v]) => String(allFields[k] || "") !== v)
-				.map(([k, v]) => `${k}: ${v}`)
-				.join(", ")
-			if (changes) {
-				onSend(`set ${changes}, then confirm`)
-			} else {
-				onSend("confirm")
+		// Parse the edited YAML and send changes back
+		const editedFields = {}
+		for (const line of yamlText.split("\n")) {
+			const match = line.match(/^(\w+):\s*(.*)$/)
+			if (match) {
+				let val = match[2].trim()
+				// Strip quotes
+				if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+					val = val.slice(1, -1)
+				}
+				editedFields[match[1]] = val
 			}
+		}
+
+		// Check for changes to editable fields
+		const changes = []
+		for (const [key, newVal] of Object.entries(editedFields)) {
+			const origVal = String(allFields[key] ?? "")
+			if (newVal !== origVal && !readonlySet.has(key)) {
+				changes.push(`${key}: ${newVal}`)
+			}
+		}
+
+		if (changes.length > 0) {
+			onSend(`set ${changes.join(", ")}, then confirm`)
 		} else {
 			onSend("confirm")
 		}
 	}
 
+	const lockedNames = (structured.readonly_fields || []).join(", ")
+
 	return (
-		<div className="sc-card sc-yaml-preview">
-			<div className="sc-header">
-				<span className="sc-icon">✅</span>
-				<span>Review & Edit — <strong>{structured.resource_id}</strong></span>
-				<span className="sc-badge sc-badge-confirming">confirming</span>
+		<div className="sc-card sc-yaml-editor">
+			<div className="sc-yaml-tab">
+				<span className="sc-yaml-tab-icon">📄</span>
+				<span className="sc-yaml-tab-name">{resourceId}.yaml</span>
+				<span className="sc-badge sc-badge-confirming">review</span>
 			</div>
-			<div className="sc-yaml-fields">
-				{Object.entries(allFields).map(([key, value]) => {
-					const isEditable = editable.has(key)
-					return (
-						<div key={key} className={`sc-yaml-row ${!isEditable ? "readonly" : ""}`}>
-							<span className="sc-yaml-key">{key}</span>
-							{isEditable ? (
-								<input
-									type="text"
-									className="sc-yaml-input"
-									value={getVal(key)}
-									onChange={(e) => setEditValues((prev) => ({ ...prev, [key]: e.target.value }))}
-								/>
-							) : (
-								<span className="sc-yaml-val">{String(value)}</span>
-							)}
-							{!isEditable && <span className="sc-badge sc-badge-locked">🔒</span>}
-						</div>
-					)
-				})}
+			<div className="sc-yaml-editor-body">
+				<textarea
+					className="sc-yaml-textarea"
+					value={yamlText}
+					onChange={(e) => setYamlText(e.target.value)}
+					spellCheck={false}
+					rows={Math.max(Object.keys(allFields).length + 1, 8)}
+				/>
 			</div>
-			<div className="sc-actions">
-				<button type="button" className="sc-btn-confirm" onClick={handleConfirm}>
-					{hasEdits ? "✓ Save Changes & Generate YAML" : "✓ Confirm & Generate YAML"}
-				</button>
-				<button type="button" className="sc-btn-cancel" onClick={() => onSend("cancel this resource")}>
-					Cancel
-				</button>
+			<div className="sc-yaml-footer">
+				<span className="sc-yaml-hint">🔒 Locked: {lockedNames}</span>
+				<div className="sc-actions">
+					<button type="button" className="sc-btn-confirm" onClick={handleConfirm}>
+						✓ Confirm & Submit
+					</button>
+					<button type="button" className="sc-btn-cancel" onClick={() => onSend("cancel this resource")}>
+						Cancel
+					</button>
+				</div>
 			</div>
 		</div>
 	)

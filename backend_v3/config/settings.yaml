@@ -24,7 +24,7 @@ db:
 # Supported resource types (add new ones here — agent auto-discovers)
 supported_resources:
   - s3
-  # - glue_db
+  - glue_db
   # - iam
   # - resource_policy
   # - smus_project
