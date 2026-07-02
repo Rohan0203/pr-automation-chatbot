@@ -777,7 +777,7 @@ export default function App() {
 		return (
 			<div className="entry-screen">
 				<div className="entry-card">
-					<div className="mini-badge">Minerva Intelligence</div>
+					<img className="entry-logo" src="/New_logo.png" alt="MINI Agent" />
 					<h1>Welcome to MINI</h1>
 					<p>Enterprise-ready agent workspace for provisioning, documentation, and PR-driven infrastructure workflows.</p>
 					{authError && <div className="error-banner">{authError}</div>}
@@ -793,7 +793,7 @@ export default function App() {
 		<div className="mini-shell">
 			<header className="top-bar">
 				<div className="top-bar-left">
-					<span className="top-bar-logo">Minerva</span>
+					<img className="top-bar-logo" src="/New_logo.png" alt="MINI Agent" />
 				</div>
 				<div className="top-bar-right">
 					<span className="top-bar-badge">
