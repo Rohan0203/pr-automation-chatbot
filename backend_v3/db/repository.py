@@ -207,3 +207,28 @@ async def load_user_profile(user_id: str) -> str | None:
     if rows and rows[0]["profile"]:
         return rows[0]["profile"]
     return None
+
+
+# ─── GitHub Tokens ────────────────────────────────────────────────────────────
+
+async def save_github_token(user_id: str, token: str):
+    """Store/update GitHub OAuth token for a user."""
+    db = await get_db()
+    await db.execute(
+        """INSERT INTO github_tokens (user_id, token, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET token=excluded.token, updated_at=excluded.updated_at""",
+        (user_id, token, datetime.utcnow().isoformat()),
+    )
+    await db.commit()
+
+
+async def load_github_token(user_id: str) -> str | None:
+    """Retrieve stored GitHub token for a user."""
+    db = await get_db()
+    rows = await db.execute_fetchall(
+        "SELECT token FROM github_tokens WHERE user_id = ?", (user_id,)
+    )
+    if rows:
+        return rows[0]["token"]
+    return None

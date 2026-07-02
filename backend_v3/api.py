@@ -84,6 +84,7 @@ async def auth_github_callback(code: str | None = None, state: str | None = None
     """Handle GitHub OAuth callback — exchange code, get username, redirect to frontend."""
     from fastapi.responses import RedirectResponse
     from auth import exchange_code, get_username, FRONTEND_URL
+    from db.repository import save_github_token
     import logging
 
     if not code:
@@ -92,6 +93,8 @@ async def auth_github_callback(code: str | None = None, state: str | None = None
     try:
         token = await exchange_code(code, state)
         username = await get_username(token)
+        # Persist token for PR creation
+        await save_github_token(username, token)
     except Exception as e:
         logging.getLogger(__name__).error(f"OAuth callback failed: {e}")
         return RedirectResponse(url=f"{FRONTEND_URL}?auth_error=true", status_code=302)

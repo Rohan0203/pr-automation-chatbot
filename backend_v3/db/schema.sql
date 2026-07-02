@@ -45,3 +45,9 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     profile TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS github_tokens (
+    user_id TEXT PRIMARY KEY,
+    token TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

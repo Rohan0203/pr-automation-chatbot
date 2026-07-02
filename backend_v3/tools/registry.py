@@ -11,6 +11,7 @@ from tools.field_tools import set_fields, get_resource_info, edit_derived_field
 from tools.derive_tools import derive_fields
 from tools.generate_tools import generate_yaml
 from tools.preference_tools import update_user_profile
+from tools.pr_tools import create_pr
 
 # ─── Tool function map ────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ TOOL_FUNCTIONS: dict[str, Callable] = {
     "derive_fields": derive_fields,
     "generate_yaml": generate_yaml,
     "update_user_profile": update_user_profile,
+    "create_pr": create_pr,
 }
 
 # ─── OpenAI tool schemas ─────────────────────────────────────────────────────
@@ -218,6 +220,18 @@ TOOL_SCHEMAS: list[dict] = [
                     },
                 },
                 "required": ["profile"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_pr",
+            "description": "Create a pull request with all completed (DONE) resources. Commits YAML files to the user's fork and opens a cross-fork PR to the upstream repo. Only call when user explicitly requests PR creation (e.g. 'create PR', 'submit', 'raise PR').",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
             },
         },
     },
