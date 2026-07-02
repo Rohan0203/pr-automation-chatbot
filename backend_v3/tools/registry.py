@@ -42,7 +42,7 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "create_resources",
-            "description": "Create one or more new resources to begin collecting fields. Call when user requests new infrastructure.",
+            "description": "Create one or more new resources. Pass initial_fields with any values extracted from the user's message (e.g. plat_env, enterprise). Remaining fields will be auto-prefilled from session history. If all fields are complete, derivation fires automatically.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -54,6 +54,10 @@ TOOL_SCHEMAS: list[dict] = [
                                 "resource_type": {
                                     "type": "string",
                                     "description": "Type of resource (e.g. 's3', 'glue_db')",
+                                },
+                                "initial_fields": {
+                                    "type": "object",
+                                    "description": "Fields extracted from the user's message to set immediately (e.g. {\"plat_env\": \"dev\", \"enterprise_or_func_name\": \"AGTR\"}). These take priority over prefilled values from session history.",
                                 },
                             },
                             "required": ["resource_type"],
