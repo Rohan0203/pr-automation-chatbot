@@ -109,21 +109,30 @@ function FieldPromptsCard({ structured, onSend }) {
 }
 
 function YamlPreviewCard({ structured, onSend }) {
-	const [yamlText, setYamlText] = useState("")
-	const [initialized, setInitialized] = useState(false)
+	const [yamlTexts, setYamlTexts] = useState({})
+	const [currentIdx, setCurrentIdx] = useState(0)
 
 	if (!structured || structured.type !== "yaml_preview") return null
 
-	const readonlySet = new Set(structured.readonly_fields || [])
-	const allFields = structured.all_fields || {}
-	const resourceId = structured.resource_id || "resource"
-	const resourceType = structured.resource_type || ""
+	// Support multiple resources via structured.resources array
+	const resources = structured.resources || [{
+		resource_id: structured.resource_id,
+		resource_type: structured.resource_type,
+		all_fields: structured.all_fields,
+		editable_fields: structured.editable_fields,
+		readonly_fields: structured.readonly_fields,
+	}]
 
-	// Build initial YAML text from all_fields on first render
-	if (!initialized && Object.keys(allFields).length > 0) {
+	const total = resources.length
+	const current = resources[currentIdx] || resources[0]
+	const readonlySet = new Set(current.readonly_fields || [])
+	const allFields = current.all_fields || {}
+	const resourceId = current.resource_id || "resource"
+
+	// Build initial YAML text for current resource if not yet initialized
+	if (!yamlTexts[resourceId] && Object.keys(allFields).length > 0) {
 		const lines = Object.entries(allFields).map(([key, value]) => {
 			const strVal = String(value ?? "")
-			// Quote logic: account IDs get single quotes, empty strings get double quotes
 			if (key === "aws_account_id" || key === "aws_region") {
 				return `${key}: '${strVal}'`
 			} else if (strVal === "") {
@@ -133,9 +142,10 @@ function YamlPreviewCard({ structured, onSend }) {
 			}
 			return `${key}: ${strVal}`
 		})
-		setYamlText(lines.join("\n"))
-		setInitialized(true)
+		setYamlTexts((prev) => ({ ...prev, [resourceId]: lines.join("\n") }))
 	}
+
+	const yamlText = yamlTexts[resourceId] || ""
 
 	const handleConfirm = () => {
 		// Parse the edited YAML and send changes back
@@ -144,7 +154,6 @@ function YamlPreviewCard({ structured, onSend }) {
 			const match = line.match(/^(\w+):\s*(.*)$/)
 			if (match) {
 				let val = match[2].trim()
-				// Strip quotes
 				if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
 					val = val.slice(1, -1)
 				}
@@ -152,7 +161,6 @@ function YamlPreviewCard({ structured, onSend }) {
 			}
 		}
 
-		// Check for changes to editable fields
 		const changes = []
 		for (const [key, newVal] of Object.entries(editedFields)) {
 			const origVal = String(allFields[key] ?? "")
@@ -162,13 +170,41 @@ function YamlPreviewCard({ structured, onSend }) {
 		}
 
 		if (changes.length > 0) {
-			onSend(`set ${changes.join(", ")}, then confirm`)
+			onSend(`set ${changes.join(", ")} for ${resourceId}, then confirm`)
 		} else {
-			onSend("confirm")
+			onSend(`confirm ${resourceId}`)
 		}
 	}
 
-	const lockedNames = (structured.readonly_fields || []).join(", ")
+	const handleConfirmAll = () => {
+		// Collect changes from all resources and confirm all at once
+		const allChanges = []
+		for (const res of resources) {
+			const resYaml = yamlTexts[res.resource_id] || ""
+			const resFields = res.all_fields || {}
+			const resReadonly = new Set(res.readonly_fields || [])
+			for (const line of resYaml.split("\n")) {
+				const match = line.match(/^(\w+):\s*(.*)$/)
+				if (match) {
+					let val = match[2].trim()
+					if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+						val = val.slice(1, -1)
+					}
+					const origVal = String(resFields[match[1]] ?? "")
+					if (val !== origVal && !resReadonly.has(match[1])) {
+						allChanges.push(`${match[1]}: ${val}`)
+					}
+				}
+			}
+		}
+		if (allChanges.length > 0) {
+			onSend(`set ${allChanges.join(", ")}, then confirm all`)
+		} else {
+			onSend("confirm all")
+		}
+	}
+
+	const lockedNames = (current.readonly_fields || []).join(", ")
 
 	return (
 		<div className="sc-card sc-yaml-editor">
@@ -176,12 +212,33 @@ function YamlPreviewCard({ structured, onSend }) {
 				<span className="sc-yaml-tab-icon">📄</span>
 				<span className="sc-yaml-tab-name">{resourceId}.yaml</span>
 				<span className="sc-badge sc-badge-confirming">review</span>
+				{total > 1 && (
+					<span className="sc-pagination">
+						<button
+							type="button"
+							className="sc-page-btn"
+							disabled={currentIdx === 0}
+							onClick={() => setCurrentIdx((i) => i - 1)}
+						>
+							◀
+						</button>
+						<span className="sc-page-info">{currentIdx + 1} / {total}</span>
+						<button
+							type="button"
+							className="sc-page-btn"
+							disabled={currentIdx === total - 1}
+							onClick={() => setCurrentIdx((i) => i + 1)}
+						>
+							▶
+						</button>
+					</span>
+				)}
 			</div>
 			<div className="sc-yaml-editor-body">
 				<textarea
 					className="sc-yaml-textarea"
 					value={yamlText}
-					onChange={(e) => setYamlText(e.target.value)}
+					onChange={(e) => setYamlTexts((prev) => ({ ...prev, [resourceId]: e.target.value }))}
 					spellCheck={false}
 					rows={Math.max(Object.keys(allFields).length + 1, 8)}
 				/>
@@ -189,10 +246,15 @@ function YamlPreviewCard({ structured, onSend }) {
 			<div className="sc-yaml-footer">
 				<span className="sc-yaml-hint">🔒 Locked: {lockedNames}</span>
 				<div className="sc-actions">
+					{total > 1 && (
+						<button type="button" className="sc-btn-confirm sc-btn-confirm-all" onClick={handleConfirmAll}>
+							✓ Confirm All ({total})
+						</button>
+					)}
 					<button type="button" className="sc-btn-confirm" onClick={handleConfirm}>
-						✓ Confirm & Submit
+						✓ Confirm{total > 1 ? ` This` : ` & Submit`}
 					</button>
-					<button type="button" className="sc-btn-cancel" onClick={() => onSend("cancel this resource")}>
+					<button type="button" className="sc-btn-cancel" onClick={() => onSend(`cancel ${resourceId}`)}>
 						Cancel
 					</button>
 				</div>

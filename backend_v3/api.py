@@ -268,32 +268,42 @@ def _build_structured_data(session: Session) -> dict | None:
     """
     active = [r for r in session.resources if r.status != ResourceStatus.DROPPED]
 
-    # Check for confirming resources → yaml_preview
+    # Check for confirming resources → yaml_preview (send all confirming)
     confirming = [r for r in active if r.status == ResourceStatus.CONFIRMING]
     if confirming:
-        resource = confirming[0]
-        config = _load_resource_config(resource.resource_type)
-        editable_fields = []
-        readonly_fields = []
+        previews = []
+        for resource in confirming:
+            config = _load_resource_config(resource.resource_type)
+            editable_fields = []
+            readonly_fields = []
 
-        if config:
-            for df in config.get("derive_fields", []):
-                edit_level = df.get("editable", "locked")
-                if edit_level in ("constrained", "free"):
-                    editable_fields.append(df["name"])
-                else:
-                    readonly_fields.append(df["name"])
-            # Collected fields are always editable
-            for cf in config.get("collect_fields", []):
-                editable_fields.append(cf["name"])
+            if config:
+                for df in config.get("derive_fields", []):
+                    edit_level = df.get("editable", "locked")
+                    if edit_level in ("constrained", "free"):
+                        editable_fields.append(df["name"])
+                    else:
+                        readonly_fields.append(df["name"])
+                for cf in config.get("collect_fields", []):
+                    editable_fields.append(cf["name"])
+
+            previews.append({
+                "resource_id": resource.resource_id,
+                "resource_type": resource.resource_type,
+                "all_fields": resource.all_fields,
+                "editable_fields": editable_fields,
+                "readonly_fields": readonly_fields,
+            })
 
         return {
             "type": "yaml_preview",
-            "resource_id": resource.resource_id,
-            "resource_type": resource.resource_type,
-            "all_fields": resource.all_fields,
-            "editable_fields": editable_fields,
-            "readonly_fields": readonly_fields,
+            "resources": previews,
+            # Keep backward-compat flat fields for single resource
+            "resource_id": previews[0]["resource_id"],
+            "resource_type": previews[0]["resource_type"],
+            "all_fields": previews[0]["all_fields"],
+            "editable_fields": previews[0]["editable_fields"],
+            "readonly_fields": previews[0]["readonly_fields"],
         }
 
     # Check for collecting resources → field_prompts with options

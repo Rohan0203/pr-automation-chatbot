@@ -244,6 +244,54 @@
 	font-weight: 500;
 }
 
+.sc-pagination {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.sc-page-btn {
+	background: #333;
+	border: 1px solid #555;
+	color: #ccc;
+	border-radius: 4px;
+	width: 24px;
+	height: 24px;
+	font-size: 11px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.15s;
+}
+
+.sc-page-btn:hover:not(:disabled) {
+	background: #444;
+}
+
+.sc-page-btn:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+
+.sc-page-info {
+	font-size: 11px;
+	color: #aaa;
+	font-weight: 500;
+	min-width: 32px;
+	text-align: center;
+}
+
+.sc-btn-confirm-all {
+	background: #1a7f37 !important;
+	border-color: #2ea043 !important;
+}
+
+.sc-btn-confirm-all:hover {
+	background: #238636 !important;
+}
+
 .sc-yaml-editor-body {
 	background: #1e1e1e;
 	padding: 0;
