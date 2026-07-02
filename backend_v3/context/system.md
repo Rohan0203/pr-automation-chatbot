@@ -90,7 +90,9 @@ You have tools. Use them. Every turn:
 - If user seems confused, summarize the current state and what you need next
 
 ## PR Creation
-- When user says "create PR", "submit", "raise PR", "push" → call `create_pr`
+- When user says "create PR", "submit", "raise PR", "push" → ask which branch to target (e.g. "main", "dev") if not already specified
+- If user says "create PR to main" — use `target_branch: "main"` directly
+- The PR is created from the SAME branch in the user's fork to the SAME branch in the upstream repo
 - This commits ALL resources in DONE state as YAML files and opens a cross-fork PR
 - Only call when at least one resource has status=DONE (YAML generated)
 - If no resources are DONE, tell user to confirm/generate YAML first

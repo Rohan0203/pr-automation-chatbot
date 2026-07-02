@@ -83,6 +83,7 @@ def _create_pr_sync(
     token: str,
     username: str,
     resources: list[dict],
+    target_branch: str = "",
 ) -> dict:
     """
     Synchronous PR creation flow using GitHub REST API (httpx).
@@ -115,38 +116,35 @@ def _create_pr_sync(
             else:
                 return {"success": False, "error": "Fork creation timed out"}
 
-        # 2. Sync fork with upstream
+        # 2. Use user-specified branch or fall back to upstream default
+        branch_name = target_branch or GITHUB_UPSTREAM_BRANCH
+
+        # 3. Sync fork with upstream for this branch
         client.post(
             f"{GITHUB_API}/repos/{fork_full}/merge-upstream",
-            json={"branch": GITHUB_UPSTREAM_BRANCH},
+            json={"branch": branch_name},
         )
 
-        # 3. Get base branch SHA
+        # 4. Get branch SHA (create branch in fork if it doesn't exist)
         resp = client.get(
-            f"{GITHUB_API}/repos/{fork_full}/git/ref/heads/{GITHUB_UPSTREAM_BRANCH}"
+            f"{GITHUB_API}/repos/{fork_full}/git/ref/heads/{branch_name}"
         )
-        if resp.status_code != 200:
-            return {"success": False, "error": f"Cannot get base branch: {resp.text}"}
-        base_sha = resp.json()["object"]["sha"]
-
-        # 4. Create feature branch
-        timestamp = int(time.time())
-        intake_ids = list({r["intake_id"] for r in resources if r.get("intake_id")})
-        branch_name = f"config/{'-'.join(intake_ids)}-{timestamp}" if intake_ids else f"config/batch-{timestamp}"
-
-        resp = client.post(
-            f"{GITHUB_API}/repos/{fork_full}/git/refs",
-            json={"ref": f"refs/heads/{branch_name}", "sha": base_sha},
-        )
-        if resp.status_code not in (200, 201):
-            # Branch might exist, append extra suffix
-            branch_name = f"{branch_name}-{int(time.time()) % 1000}"
-            resp = client.post(
+        if resp.status_code == 200:
+            base_sha = resp.json()["object"]["sha"]
+        else:
+            # Branch doesn't exist in fork — get upstream branch SHA and create it
+            upstream_ref = client.get(
+                f"{GITHUB_API}/repos/{GITHUB_UPSTREAM_OWNER}/{GITHUB_UPSTREAM_REPO}/git/ref/heads/{branch_name}"
+            )
+            if upstream_ref.status_code != 200:
+                return {"success": False, "error": f"Branch '{branch_name}' not found in upstream repo."}
+            base_sha = upstream_ref.json()["object"]["sha"]
+            create_ref = client.post(
                 f"{GITHUB_API}/repos/{fork_full}/git/refs",
                 json={"ref": f"refs/heads/{branch_name}", "sha": base_sha},
             )
-            if resp.status_code not in (200, 201):
-                return {"success": False, "error": f"Branch creation failed: {resp.text}"}
+            if create_ref.status_code not in (200, 201):
+                return {"success": False, "error": f"Failed to create branch '{branch_name}' in fork: {create_ref.text}"}
 
         # 5. Commit files (one commit with tree API for batch)
         # Get base tree
@@ -201,7 +199,8 @@ def _create_pr_sync(
             json={"sha": new_commit_sha},
         )
 
-        # 6. Create PR
+        # 6. Create PR (from fork:branch → upstream:branch)
+        intake_ids = list({r["intake_id"] for r in resources if r.get("intake_id")})
         pr_title = f"[CONFIG] {', '.join(r.get('resource_type', '').upper() for r in resources)} — {', '.join(intake_ids)}"
         pr_body_parts = ["## Infrastructure Configuration\n"]
         for r in resources:
@@ -217,7 +216,7 @@ def _create_pr_sync(
                 "title": pr_title,
                 "body": "\n".join(pr_body_parts),
                 "head": f"{username}:{branch_name}",
-                "base": GITHUB_UPSTREAM_BRANCH,
+                "base": branch_name,
             },
         )
         if pr_resp.status_code not in (200, 201):
@@ -239,6 +238,7 @@ async def create_pr(**kwargs) -> str:
     Create a PR with all DONE resources in the current session.
     Uses the authenticated user's GitHub token from the DB.
     """
+    target_branch = kwargs.get("target_branch", "").strip()
     session = _get_session()
 
     # Find all DONE resources with YAML
@@ -277,6 +277,9 @@ async def create_pr(**kwargs) -> str:
             "yaml_content": r.yaml_output,
         })
 
+    if not target_branch:
+        return json.dumps({"error": "Please specify which branch to push to (e.g. 'main', 'dev')."})
+
     # Run the sync GitHub operations in a thread pool
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor() as pool:
@@ -286,6 +289,7 @@ async def create_pr(**kwargs) -> str:
             token,
             session.user_id,
             pr_resources,
+            target_branch,
         )
 
     return json.dumps(result)

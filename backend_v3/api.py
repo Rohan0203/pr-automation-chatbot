@@ -324,6 +324,7 @@ def _build_structured_data(session: Session) -> dict | None:
                     "resource_id": resource.resource_id,
                     "resource_type": resource.resource_type,
                     "fields": missing_fields,
+                    "total_resources": len(active),
                 }
 
     # Multiple active resources → carousel

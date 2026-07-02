@@ -227,11 +227,16 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "create_pr",
-            "description": "Create a pull request with all completed (DONE) resources. Commits YAML files to the user's fork and opens a cross-fork PR to the upstream repo. Only call when user explicitly requests PR creation (e.g. 'create PR', 'submit', 'raise PR').",
+            "description": "Create a pull request with all completed (DONE) resources. Commits YAML files to the user's fork and opens a cross-fork PR to the upstream repo. The PR is created from the same branch in the fork to the same branch in upstream. Only call when user explicitly requests PR creation (e.g. 'create PR', 'submit', 'raise PR'). Always ask the user which branch to target.",
             "parameters": {
                 "type": "object",
-                "properties": {},
-                "required": [],
+                "properties": {
+                    "target_branch": {
+                        "type": "string",
+                        "description": "The branch name to push to in the fork and create PR against in the upstream repo (e.g. 'main', 'dev')."
+                    }
+                },
+                "required": ["target_branch"],
             },
         },
     },

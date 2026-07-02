@@ -41,7 +41,7 @@ function FieldPromptsCard({ structured, onSend }) {
 		<div className="sc-card sc-field-prompts">
 			<div className="sc-header">
 				<span className="sc-icon">📋</span>
-				<span>Fields needed for <strong>{structured.resource_type?.toUpperCase()}</strong> resource</span>
+				<span>Fields needed to create requested resource{(structured.total_resources || 1) > 1 ? 's' : ''}</span>
 				<span className="sc-badge sc-badge-collecting">{filledCount}/{fields.length}</span>
 			</div>
 			<div className="sc-fields-list">
